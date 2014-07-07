@@ -10,19 +10,33 @@ nothing works yet.
 package main
 
 import (
+  "log"
   "time"
   "math/rand"
+  "github.com/adammck/serial"
   "github.com/adammck/dynamixel"
 )
 
 func main() {
 
-  // This doesn't actually work yet!
-  network := dynamixel.NewNetwork("/dev/cu.usbserial-A9ITPZVR")
+  options := serial.OpenOptions{
+    PortName: "/dev/tty.usbserial-A9ITPZVR",
+    BaudRate: 1000000,
+    DataBits: 8,
+    StopBits: 1,
+    MinimumReadSize: 4,
+  }
+
+  serial, err := serial.Open(options)
+  if err != nil {
+    log.Fatal(err)
+  }
+
+  network := dynamixel.NewNetwork(serial)
   servo := dynamixel.NewServo(network, 1)
 
   for {
-    // Nor does this!
+    // This doesn't actually work yet!
     servo.SetGoalPosition(rand.Intn(1024))
     time.Sleep(2 * time.Second)
   }
