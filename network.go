@@ -1,30 +1,30 @@
 package dynamixel
 
 import (
-  "io"
-  "bytes"
+	"bytes"
+	"io"
 )
 
 const (
 
-  // Instruction Types
-  Ping      byte = 0x01
-  ReadData  byte = 0x02
-  WriteData byte = 0x03
-  RegWrite  byte = 0x04
-  Action    byte = 0x05
-  Reset     byte = 0x06
-  SyncWrite byte = 0x83
+	// Instruction Types
+	Ping      byte = 0x01
+	ReadData  byte = 0x02
+	WriteData byte = 0x03
+	RegWrite  byte = 0x04
+	Action    byte = 0x05
+	Reset     byte = 0x06
+	SyncWrite byte = 0x83
 )
 
 type DynamixelNetwork struct {
-  Serial io.ReadWriteCloser
+	Serial io.ReadWriteCloser
 }
 
 func NewNetwork(serial io.ReadWriteCloser) *DynamixelNetwork {
-  return &DynamixelNetwork{
-    Serial: serial,
-  }
+	return &DynamixelNetwork{
+		Serial: serial,
+	}
 }
 
 //
@@ -35,41 +35,41 @@ func NewNetwork(serial io.ReadWriteCloser) *DynamixelNetwork {
 //
 func (n *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte, params ...byte) error {
 
-  buf := new(bytes.Buffer)
-  paramsLength := byte(len(params) + 2)
+	buf := new(bytes.Buffer)
+	paramsLength := byte(len(params) + 2)
 
-  // build instruction packet
+	// build instruction packet
 
-  buf.Write([]byte{
-    0xFF, 0xFF,         // instruction header
-    byte(ident),        // target Dynamixel ID
-    byte(paramsLength), // len(params) + 2
-    instruction,        // instruction type (read/write/etc)
-  })
+	buf.Write([]byte{
+		0xFF, 0xFF, // instruction header
+		byte(ident),        // target Dynamixel ID
+		byte(paramsLength), // len(params) + 2
+		instruction,        // instruction type (read/write/etc)
+	})
 
-  buf.Write(params)
+	buf.Write(params)
 
-  // calculate checksum
+	// calculate checksum
 
-  sum := ident + paramsLength + instruction
+	sum := ident + paramsLength + instruction
 
-  for _, value := range params {
-      sum += value
-  }
+	for _, value := range params {
+		sum += value
+	}
 
-  buf.WriteByte(byte((^sum) & 0xFF))
+	buf.WriteByte(byte((^sum) & 0xFF))
 
-  // write to port
+	// write to port
 
-  _, err := buf.WriteTo(n.Serial)
+	_, err := buf.WriteTo(n.Serial)
 
-  if err != nil {
-    return err
-  }
+	if err != nil {
+		return err
+	}
 
-  return nil
+	return nil
 }
 
 func (n *DynamixelNetwork) WriteData(ident uint8, params ...byte) error {
-  return n.WriteInstruction(ident, WriteData, params...)
+	return n.WriteInstruction(ident, WriteData, params...)
 }
