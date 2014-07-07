@@ -3,7 +3,6 @@ package dynamixel
 import (
   "io"
   "bytes"
-  "encoding/binary"
 )
 
 const (
@@ -37,35 +36,35 @@ func NewNetwork(serial io.ReadWriteCloser) *DynamixelNetwork {
 func (n *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte, params ...byte) error {
 
   buf := new(bytes.Buffer)
+  paramsLength := byte(len(params) + 2)
 
-  // beginning of packet
-  buf.Write([]byte{0xFF, 0xFF})
+  // build instruction packet
 
-  // target Dynamixel ID
-  binary.Write(buf, binary.LittleEndian, ident)
+  buf.Write([]byte{
+    0xFF, 0xFF,         // instruction header
+    byte(ident),        // target Dynamixel ID
+    byte(paramsLength), // len(params) + 2
+    instruction,        // instruction type (read/write/etc)
+  })
 
-  // length (== number of parameters plus two)
-  length := uint8(len(params) + 2)
-  binary.Write(buf, binary.LittleEndian, length)
-
-  // instruction
-  buf.WriteByte(instruction)
-
-  // parameter 0..n
   buf.Write(params)
 
-  // checksum
-  sum := ident + length + instruction
+  // calculate checksum
+
+  sum := ident + paramsLength + instruction
+
   for _, value := range params {
       sum += value
   }
-  sum = (^sum) & 0xFF
-  binary.Write(buf, binary.LittleEndian, sum)
 
-  _, err := buf.WriteTo(n.Serial);
+  buf.WriteByte(byte((^sum) & 0xFF))
+
+  // write to port
+
+  _, err := buf.WriteTo(n.Serial)
 
   if err != nil {
-    return nil
+    return err
   }
 
   return nil
