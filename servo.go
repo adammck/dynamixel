@@ -9,6 +9,7 @@ const (
   // Control Table Start Addresses
   addrLed          byte = 0x19 // 1
   addrGoalPosition byte = 0x1E // 2
+  addrMovingSpeed  byte = 0x20 // 2
 )
 
 type DynamixelServo struct {
@@ -32,6 +33,14 @@ func btoi(b bool) uint8 {
   return 0
 }
 
+func low(i int) byte {
+  return byte(i & 0xFF)
+}
+
+func high(i int) byte {
+  return low(i >> 8)
+}
+
 func (servo *DynamixelServo) writeData(params ...byte) error {
   return servo.Network.WriteData(servo.Ident, params...)
 }
@@ -46,5 +55,13 @@ func (servo *DynamixelServo) SetGoalPosition(pos int) error {
   if pos < 0 || pos > 1023 {
     return errors.New("goal position out of range")
   }
-  return servo.writeData(addrGoalPosition, byte(pos & 0xFF), byte((pos >> 8) & 0xFF))
+  return servo.writeData(addrGoalPosition, low(pos), high(pos))
+}
+
+// Sets the moving speed.
+func (servo *DynamixelServo) SetMovingSpeed(speed int) error {
+  if speed < 0 || speed > 1023 {
+    return errors.New("moving speed out of range")
+  }
+  return servo.writeData(addrMovingSpeed, low(speed), high(speed))
 }
