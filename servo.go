@@ -1,10 +1,14 @@
 package dynamixel
 
+import (
+  "errors"
+)
+
 const (
 
-  // Control Table Addresses
-  ModelNumber byte = 0x00
-  Led         byte = 0x19
+  // Control Table Start Addresses
+  addrLed          byte = 0x19 // 1
+  addrGoalPosition byte = 0x1E // 2
 )
 
 type DynamixelServo struct {
@@ -34,5 +38,13 @@ func (servo *DynamixelServo) writeData(params ...byte) error {
 
 // Enables or disables the LED.
 func (servo *DynamixelServo) SetLed(status bool) error {
-  return servo.writeData(Led, btoi(status))
+  return servo.writeData(addrLed, btoi(status))
+}
+
+// Sets the goal position.
+func (servo *DynamixelServo) SetGoalPosition(pos int) error {
+  if pos < 0 || pos > 1023 {
+    return errors.New("goal position out of range")
+  }
+  return servo.writeData(addrGoalPosition, byte(pos & 0xFF), byte((pos >> 8) & 0xFF))
 }
