@@ -6,7 +6,8 @@ import (
 
 const (
 
-  // Control Table Start Addresses
+  // Control Table Addresses
+  addrTorqueEnable byte = 0x18 // 1
   addrLed          byte = 0x19 // 1
   addrGoalPosition byte = 0x1E // 2
   addrMovingSpeed  byte = 0x20 // 2
@@ -45,9 +46,14 @@ func (servo *DynamixelServo) writeData(params ...byte) error {
   return servo.Network.WriteData(servo.Ident, params...)
 }
 
+// Enables or disables torque.
+func (servo *DynamixelServo) SetTorqueEnable(state bool) error {
+  return servo.writeData(addrTorqueEnable, btoi(state))
+}
+
 // Enables or disables the LED.
-func (servo *DynamixelServo) SetLed(status bool) error {
-  return servo.writeData(addrLed, btoi(status))
+func (servo *DynamixelServo) SetLed(state bool) error {
+  return servo.writeData(addrLed, btoi(state))
 }
 
 // Sets the goal position.
