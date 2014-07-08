@@ -11,6 +11,9 @@ const (
 	addrLed          byte = 0x19 // 1
 	addrGoalPosition byte = 0x1E // 2
 	addrMovingSpeed  byte = 0x20 // 2
+
+	// Read Only
+	addrCurrentPosition byte = 0x24 // 2
 )
 
 type DynamixelServo struct {
@@ -42,6 +45,10 @@ func high(i int) byte {
 	return low(i >> 8)
 }
 
+func (servo *DynamixelServo) readData(startAddress byte, length int) (uint16, error) {
+	return servo.Network.ReadData(servo.Ident, startAddress, length)
+}
+
 func (servo *DynamixelServo) writeData(params ...byte) error {
 	return servo.Network.WriteData(servo.Ident, params...)
 }
@@ -70,4 +77,9 @@ func (servo *DynamixelServo) SetMovingSpeed(speed int) error {
 		return errors.New("moving speed out of range")
 	}
 	return servo.writeData(addrMovingSpeed, low(speed), high(speed))
+}
+
+// Returns the current position.
+func (servo *DynamixelServo) Position() (uint16, error) {
+	return servo.readData(addrCurrentPosition, 2)
 }
