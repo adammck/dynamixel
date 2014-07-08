@@ -1,7 +1,7 @@
 # Dynamixel
 
-This packages provides a Go interface to Dynamixel servos. It's brand new and
-nothing works yet.
+This packages provides a Go interface to Dynamixel servos. It's brand new, but
+some things kind of work.
 
 
 ## Example
@@ -11,44 +11,52 @@ package main
 
 import (
   "log"
-  "time"
-  "math/rand"
   "github.com/adammck/serial"
   "github.com/adammck/dynamixel"
 )
 
 func main() {
-
   options := serial.OpenOptions{
     PortName: "/dev/tty.usbserial-A9ITPZVR",
     BaudRate: 1000000,
     DataBits: 8,
     StopBits: 1,
-    MinimumReadSize: 4,
+    MinimumReadSize: 1,
   }
 
-  serial, err := serial.Open(options)
-  if err != nil {
-    log.Fatal(err)
+  serial, openErr := serial.Open(options); if openErr != nil {
+    log.Fatalf("error opening serial port: %v\n", openErr)
   }
 
   network := dynamixel.NewNetwork(serial)
   servo := dynamixel.NewServo(network, 1)
 
-  for {
-    // This doesn't actually work yet!
-    servo.SetGoalPosition(rand.Intn(1024))
-    time.Sleep(2 * time.Second)
+  moveErr := servo.SetGoalPosition(512); if moveErr != nil {
+    log.Fatalf("error setting goal position: %v\n", moveErr)
   }
 }
 ```
 
 
+## Documentation
+
+The docs can be found at [godoc.org] [docs], as usual.  
+The API is based on the Dynamixel [AX protocol] [proto] docs.
+
+
 ## License
 
-[MIT] (https://github.com/adammck/dynamixel/blob/master/LICENSE), obv.
+[MIT] [license], obv.
 
 
 ## Author
 
-[Adam Mckaig] (http://github.com/adammck) made this just for you.
+[Adam Mckaig] [adammck] made this just for you.  
+
+
+
+
+[docs]:    https://godoc.org/github.com/adammck/dynamixel
+[proto]:   http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm#Control_Table
+[license]: https://github.com/adammck/dynamixel/blob/master/LICENSE
+[adammck]: http://github.com/adammck
