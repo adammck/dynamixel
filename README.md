@@ -11,7 +11,7 @@ package main
 
 import (
   "log"
-  "github.com/adammck/serial"
+  "github.com/jacobsa/go-serial/serial"
   "github.com/adammck/dynamixel"
 )
 
