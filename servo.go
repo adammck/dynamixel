@@ -11,6 +11,7 @@ const (
 	addrLed          byte = 0x19 // 1
 	addrGoalPosition byte = 0x1E // 2
 	addrMovingSpeed  byte = 0x20 // 2
+	addrTorqueLimit  byte = 0x22 // 2
 
 	// Read Only
 	addrCurrentPosition byte = 0x24 // 2
@@ -77,6 +78,14 @@ func (servo *DynamixelServo) SetMovingSpeed(speed int) error {
 		return errors.New("moving speed out of range")
 	}
 	return servo.writeData(addrMovingSpeed, low(speed), high(speed))
+}
+
+// Sets the torque limit.
+func (servo *DynamixelServo) SetTorqueLimit(limit int) error {
+	if limit < 0 || limit > 1023 {
+		return errors.New("torque limit out of range")
+	}
+	return servo.writeData(addrTorqueLimit, low(limit), high(limit))
 }
 
 // Returns the current position.
