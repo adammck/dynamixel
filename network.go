@@ -2,6 +2,7 @@ package dynamixel
 
 import (
 	"bytes"
+	"strings"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -17,16 +18,78 @@ const (
 	Action    byte = 0x05
 	Reset     byte = 0x06
 	SyncWrite byte = 0x83
+
+	// Send an instruction to all servos
+	BroadcastIdent byte = 0xFE // 254
 )
 
 type DynamixelNetwork struct {
-	Serial io.ReadWriteCloser
+	Serial   io.ReadWriteCloser
+	Buffered bool
 }
 
 func NewNetwork(serial io.ReadWriteCloser) *DynamixelNetwork {
 	return &DynamixelNetwork{
 		Serial: serial,
+		Buffered: false,
 	}
+}
+
+//
+// Puts the network in bufferred write mode, which means that the REG_WRITE
+// instruction will be used, rather than WRITE_DATA. This causes calls to
+// WriteData to be bufferred until the Action method is called, at which time
+// they'll all be executed at once.
+//
+// This is very useful for synchronizing the movements of multiple servos.
+//
+func (n *DynamixelNetwork) SetBuffered(buffered bool) {
+	n.Buffered = buffered
+}
+
+//
+// Converts an error byte (as included in a status packet) into an error object
+// with a friendly error message. We can't be too specific about it, because any
+// combination of errors might occur at the same time.
+//
+// See: http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm#Status_Packet
+//
+func DecodeStatusError(errBits byte) error {
+	str := []string{}
+
+	if(errBits & 1 == 1) {
+		str = append(str, "input voltage")
+	}
+
+	if(errBits & 2 == 2) {
+		str = append(str, "angle limit")
+	}
+
+	if(errBits & 4 == 4) {
+		str = append(str, "overheating")
+	}
+
+	if(errBits & 8 == 8) {
+		str = append(str, "range")
+	}
+
+	if(errBits & 16 == 16) {
+		str = append(str, "checksum")
+	}
+
+	if(errBits & 32 == 32) {
+		str = append(str, "overload")
+	}
+
+	if(errBits & 64 == 64) {
+		str = append(str, "instruction")
+	}
+
+	if(errBits & 128 == 128) {
+		str = append(str, "unknown")
+	}
+
+	return fmt.Errorf("status error(s): %s", strings.Join(str, ", "))
 }
 
 //
@@ -96,7 +159,7 @@ func (network *DynamixelNetwork) ReadStatusPacket(expectIdent uint8) ([]byte, er
 	}
 
 	if buf[0] != 0xFF || buf[1] != 0xFF {
-		fmt.Printf("bad header! buf: %#v\n", buf)
+		return []byte{}, fmt.Errorf("bad status packet header: %x %x", buf[0], buf[1])
 	}
 
 	resIdent := uint8(buf[2])
@@ -127,7 +190,7 @@ func (network *DynamixelNetwork) ReadStatusPacket(expectIdent uint8) ([]byte, er
 	// TODO: decode the error bit(s) and return a proper message!
 
 	if errBits != 0x0 {
-		fmt.Printf("err code! buf: %#v\n", errBits)
+		return []byte{}, DecodeStatusError(errBits)
 	}
 
 	// return an error if we received a packet with the wrong ID. this indicates
@@ -163,7 +226,15 @@ func (n *DynamixelNetwork) ReadData(ident uint8, startAddress byte, length int) 
 }
 
 func (n *DynamixelNetwork) WriteData(ident uint8, params ...byte) error {
-	writeErr := n.WriteInstruction(ident, WriteData, params...)
+	var instruction byte
+
+	if(n.Buffered) {
+		instruction = RegWrite
+	} else {
+		instruction = WriteData
+	}
+
+	writeErr := n.WriteInstruction(ident, instruction, params...)
 	if writeErr != nil {
 		return writeErr
 	}
@@ -174,4 +245,15 @@ func (n *DynamixelNetwork) WriteData(ident uint8, params ...byte) error {
 	}
 
 	return nil
+}
+
+//
+// Broadcasts the ACTION instruction, which initiates any previously bufferred
+// instructions.
+//
+// Doesn't wait for a status packet in response, because they are not sent in
+// response to broadcast instructions.
+//
+func (n *DynamixelNetwork) Action() error {
+	return n.WriteInstruction(BroadcastIdent, Action)
 }
