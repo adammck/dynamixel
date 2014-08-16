@@ -37,6 +37,8 @@ func main() {
 }
 ```
 
+More examples can be found in the [examples] [examples] directory of this repo.
+
 
 ## Documentation
 
@@ -56,7 +58,8 @@ The API is based on the Dynamixel [AX protocol] [proto] docs.
 
 
 
-[docs]:    https://godoc.org/github.com/adammck/dynamixel
-[proto]:   http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm#Control_Table
-[license]: https://github.com/adammck/dynamixel/blob/master/LICENSE
-[adammck]: http://github.com/adammck
+[docs]:     https://godoc.org/github.com/adammck/dynamixel
+[examples]: https://github.com/adammck/dynamixel/tree/master/examples
+[proto]:    http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm#Control_Table
+[license]:  https://github.com/adammck/dynamixel/blob/master/LICENSE
+[adammck]:  http://github.com/adammck
