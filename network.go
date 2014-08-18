@@ -2,10 +2,11 @@ package dynamixel
 
 import (
 	"bytes"
-	"strings"
 	"encoding/binary"
 	"fmt"
 	"io"
+	"log"
+	"strings"
 )
 
 const (
@@ -26,12 +27,14 @@ const (
 type DynamixelNetwork struct {
 	Serial   io.ReadWriteCloser
 	Buffered bool
+	Debug    bool
 }
 
 func NewNetwork(serial io.ReadWriteCloser) *DynamixelNetwork {
 	return &DynamixelNetwork{
-		Serial: serial,
+		Serial:   serial,
 		Buffered: false,
+		Debug:    false,
 	}
 }
 
@@ -57,35 +60,35 @@ func (n *DynamixelNetwork) SetBuffered(buffered bool) {
 func DecodeStatusError(errBits byte) error {
 	str := []string{}
 
-	if(errBits & 1 == 1) {
+	if errBits&1 == 1 {
 		str = append(str, "input voltage")
 	}
 
-	if(errBits & 2 == 2) {
+	if errBits&2 == 2 {
 		str = append(str, "angle limit")
 	}
 
-	if(errBits & 4 == 4) {
+	if errBits&4 == 4 {
 		str = append(str, "overheating")
 	}
 
-	if(errBits & 8 == 8) {
+	if errBits&8 == 8 {
 		str = append(str, "range")
 	}
 
-	if(errBits & 16 == 16) {
+	if errBits&16 == 16 {
 		str = append(str, "checksum")
 	}
 
-	if(errBits & 32 == 32) {
+	if errBits&32 == 32 {
 		str = append(str, "overload")
 	}
 
-	if(errBits & 64 == 64) {
+	if errBits&64 == 64 {
 		str = append(str, "instruction")
 	}
 
-	if(errBits & 128 == 128) {
+	if errBits&128 == 128 {
 		str = append(str, "unknown")
 	}
 
@@ -98,8 +101,7 @@ func DecodeStatusError(errBits byte) error {
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_instruction.htm
 //
-func (n *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte, params ...byte) error {
-
+func (network *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte, params ...byte) error {
 	buf := new(bytes.Buffer)
 	paramsLength := byte(len(params) + 2)
 
@@ -127,7 +129,8 @@ func (n *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte, param
 
 	// write to port
 
-	_, err := buf.WriteTo(n.Serial)
+	network.Log(">> %#v\n", buf.Bytes())
+	_, err := buf.WriteTo(network.Serial)
 
 	if err != nil {
 		return err
@@ -136,54 +139,99 @@ func (n *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte, param
 	return nil
 }
 
+//
+// Reads `b` bytes, blocking if they're not immediately available.
+//
+func (network *DynamixelNetwork) read(b int) ([]byte, error) {
+	buf := make([]byte, b)
+	n := 0
+
+	for n < b {
+		nn, err := network.Serial.Read(buf[n:])
+		n += nn
+
+		// It's okay if we reached the end of the available bytes. They're probably
+		// just not available yet. Other errors are fatal.
+		if err != nil && err != io.EOF {
+			return buf, err
+		}
+	}
+
+	return buf, nil
+}
+
 func (network *DynamixelNetwork) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 
 	//
 	// Status packets are similar to instruction packet:
 	//
-	// +------+------+-------+----------+---------+--------+--------+----------+
-	// | 0xFF | 0xFF | ident | params+2 | errBits | param1 | param2 | checksum |
-	// +------+------+-------+----------+---------+--------+--------+----------+
+	// +------+------+ ------ +-------+----------+---------+--------+--------+----------+
+	// | 0xFF | 0xFF |  0xFF  | ident | params+2 | errBits | param1 | param2 | checksum |
+	// +------+------+ ------ +-------+----------+---------+--------+--------+----------+
+	//
+	//                  ^-- sometimes, but it shouldn't be there?!
 	//
 	// We don't know the length, because responses can have variable numbers of
 	// parameters.
 	//
 
-	// read the first five bytes, which are always present. we don't know how many
-	// parameters follow that, until we've read buf[3]
+	// Read the first three bytes, which are always present. Hopefully, the first
+	// two are the header, and the third is the ID of the servo which this packet
+	// refers to. But sometimes, the third byte is another 0xFF. I don't know why,
+	// and I can't seem to find any useful information on the matter.
 
-	buf := make([]byte, 5)
-	n, err := network.Serial.Read(buf)
-	if n == 0 && err != nil {
-		return []byte{}, err
+	headerBuf, headerErr := network.read(3)
+	network.Log("<< %#v (header, ident)\n", headerBuf)
+	if headerErr != nil {
+		return []byte{}, headerErr
 	}
 
-	if buf[0] != 0xFF || buf[1] != 0xFF {
-		return []byte{}, fmt.Errorf("bad status packet header: %x %x", buf[0], buf[1])
+	if headerBuf[0] != 0xFF || headerBuf[1] != 0xFF {
+		return []byte{}, fmt.Errorf("bad status packet header: %x %x", headerBuf[0], headerBuf[1])
 	}
 
-	resIdent := uint8(buf[2])
-	numParams := uint8(buf[3]) - 2
-	errBits := buf[4]
+	// The third byte should be the ident. But if an extra header byte has shown
+	// up, ignore it and read another byte to replace it.
+
+	resIdent := uint8(headerBuf[2])
+	if resIdent == 255 {
+
+		identBuf, identErr := network.read(1)
+		network.Log("<< %#v (ident retry)\n", identBuf)
+		if identErr != nil {
+			return []byte{}, identErr
+		}
+
+		resIdent = uint8(identBuf[0])
+	}
+
+	// The next two bytes are always present, so just read them.
+
+	paramCountAndErrBitsBuf, pcebErr := network.read(2)
+	network.Log("<< %#v (p+2, errbits)\n", paramCountAndErrBitsBuf)
+	if pcebErr != nil {
+		return []byte{}, pcebErr
+	}
+
+	numParams := uint8(paramCountAndErrBitsBuf[0]) - 2
+	errBits := paramCountAndErrBitsBuf[1]
 
 	// now read the params, if there are any. we must do this before checking for
 	// errors, to avoid leaving junk in the buffer.
 
-	paramsBuf := make([]byte, numParams)
-	if numParams > 0 {
-		n2, err2 := network.Serial.Read(paramsBuf)
-		if n2 == 0 && err2 != nil {
-			return []byte{}, err2
-		}
+	paramsBuf, paramsErr := network.read(int(numParams))
+	network.Log("<< %#v (params)\n", paramsBuf)
+	if paramsErr != nil {
+		return []byte{}, paramsErr
 	}
 
 	// read the checksum, which is always one byte
 	// TODO: check the checksum
 
-	checksumBuf := make([]byte, 1)
-	n3, err3 := network.Serial.Read(checksumBuf)
-	if n3 == 0 && err3 != nil {
-		return []byte{}, err3
+	checksumBuf, checksumErr := network.read(1)
+	network.Log("<< %#v (checksum)\n", checksumBuf)
+	if checksumErr != nil {
+		return []byte{}, checksumErr
 	}
 
 	// return an error if the packet contained one.
@@ -216,6 +264,7 @@ func (n *DynamixelNetwork) ReadData(ident uint8, startAddress byte, length int) 
 	if err2 != nil {
 		return 0, err2
 	}
+
 	var val uint16
 	err3 := binary.Read(bytes.NewReader(buf), binary.LittleEndian, &val)
 	if err3 != nil {
@@ -228,7 +277,7 @@ func (n *DynamixelNetwork) ReadData(ident uint8, startAddress byte, length int) 
 func (n *DynamixelNetwork) WriteData(ident uint8, params ...byte) error {
 	var instruction byte
 
-	if(n.Buffered) {
+	if n.Buffered {
 		instruction = RegWrite
 	} else {
 		instruction = WriteData
@@ -256,4 +305,10 @@ func (n *DynamixelNetwork) WriteData(ident uint8, params ...byte) error {
 //
 func (n *DynamixelNetwork) Action() error {
 	return n.WriteInstruction(BroadcastIdent, Action)
+}
+
+func (n *DynamixelNetwork) Log(format string, v ...interface{}) {
+	if n.Debug {
+		log.Printf(format, v...)
+	}
 }
