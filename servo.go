@@ -71,6 +71,19 @@ func posDistance(a uint16, b uint16) uint16 {
 }
 
 //
+func normalizeAngle(d float64) float64 {
+	if d > 180 {
+		return normalizeAngle(d - 360)
+
+	} else if d < -180 {
+		return normalizeAngle(d + 360)
+
+	} else {
+		return d
+	}
+}
+
+//
 // -- High-level interface
 //
 //    These methods should provide as useful and friendly of an interface to the
@@ -104,9 +117,15 @@ func (servo *DynamixelServo) Angle() (float64, error) {
 	}
 }
 
-// Sets the goal position of the servo, by angle.
+// MoveTo sets the goal position of the servo by angle (in degrees), where zero
+// is the midpoint, 150 deg is max left (clockwise), and -150 deg is max right
+// (counter-clockwise). This is generally preferable to calling SetGoalPosition,
+// which uses the internal uint16 representation.
+//
+// If the angle is out of bounds
+//
 func (servo *DynamixelServo) MoveTo(angle float64) error {
-	pos := int(servo.angleToPos(angle))
+	pos := int(servo.angleToPos(normalizeAngle(angle)))
 	return servo.SetGoalPosition(pos)
 }
 
