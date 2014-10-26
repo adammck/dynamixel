@@ -2,6 +2,7 @@ package dynamixel
 
 import (
 	"errors"
+	"math"
 )
 
 const (
@@ -15,18 +16,29 @@ const (
 
 	// Read Only
 	addrCurrentPosition byte = 0x24 // 2
+
+	// Limits (from dxl_ax_actuator.htm)
+	maxPos   uint16  = 1023
+	maxSpeed uint16  = 1023
+	maxAngle float64 = 300
+
+	// Unit conversions
+	positionToAngle float64 = maxAngle / float64(maxPos) // 0.293255132
+	angleToPosition float64 = 1 / positionToAngle        // 3.41
 )
 
 type DynamixelServo struct {
-	Network *DynamixelNetwork
-	Ident   uint8
+	Network   *DynamixelNetwork
+	Ident     uint8
+	zeroAngle float64
 }
 
 // http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm
 func NewServo(network *DynamixelNetwork, ident uint8) *DynamixelServo {
 	return &DynamixelServo{
-		Network: network,
-		Ident:   ident,
+		Network:   network,
+		Ident:     ident,
+		zeroAngle: 150,
 	}
 }
 
@@ -54,6 +66,57 @@ func (servo *DynamixelServo) writeData(params ...byte) error {
 	return servo.Network.WriteData(servo.Ident, params...)
 }
 
+func posDistance(a uint16, b uint16) uint16 {
+	return uint16(math.Abs(float64(a) - float64(b)))
+}
+
+//
+// -- High-level interface
+//
+//    These methods should provide as useful and friendly of an interface to the
+//    servo as possible.
+
+func (servo *DynamixelServo) posToAngle(pos uint16) float64 {
+	return (positionToAngle * float64(pos)) - servo.zeroAngle
+}
+
+func (servo *DynamixelServo) angleToPos(angle float64) uint16 {
+	pos := uint16((servo.zeroAngle + angle) * angleToPosition)
+	return pos
+}
+
+// Sets the origin angle (in degrees).
+func (servo *DynamixelServo) SetZero(offset float64) {
+	servo.zeroAngle = offset
+}
+
+//
+// Returns the current position of the servo, relative to the zero angle.
+//
+func (servo *DynamixelServo) Angle() (float64, error) {
+	pos, err := servo.Position()
+
+	if err != nil {
+		return 0, err
+
+	} else {
+		return servo.posToAngle(pos), nil
+	}
+}
+
+// Sets the goal position of the servo, by angle.
+func (servo *DynamixelServo) MoveTo(angle float64) error {
+	pos := int(servo.angleToPos(angle))
+	return servo.SetGoalPosition(pos)
+}
+
+//
+// -- Low-level interface
+//
+//    These methods should follow the Dynamixel protocol docs as closely as
+//    possible, with no fancy stuff.
+//
+
 // Enables or disables torque.
 func (servo *DynamixelServo) SetTorqueEnable(state bool) error {
 	return servo.writeData(addrTorqueEnable, btoi(state))
@@ -65,8 +128,9 @@ func (servo *DynamixelServo) SetLed(state bool) error {
 }
 
 // Sets the goal position.
+// See: http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm#Actuator_Address_1E
 func (servo *DynamixelServo) SetGoalPosition(pos int) error {
-	if pos < 0 || pos > 1023 {
+	if pos < 0 || pos > int(maxPos) {
 		return errors.New("goal position out of range")
 	}
 	return servo.writeData(addrGoalPosition, low(pos), high(pos))
@@ -74,7 +138,7 @@ func (servo *DynamixelServo) SetGoalPosition(pos int) error {
 
 // Sets the moving speed.
 func (servo *DynamixelServo) SetMovingSpeed(speed int) error {
-	if speed < 0 || speed > 1023 {
+	if speed < 0 || speed > int(maxSpeed) {
 		return errors.New("moving speed out of range")
 	}
 	return servo.writeData(addrMovingSpeed, low(speed), high(speed))
