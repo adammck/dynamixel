@@ -19,23 +19,30 @@ func main() {
 	flag.Parse()
 
 	options := serial.OpenOptions{
-		PortName:        *portName,
-		BaudRate:        1000000,
-		DataBits:        8,
-		StopBits:        1,
-		MinimumReadSize: 1,
+		PortName:              *portName,
+		BaudRate:              1000000,
+		DataBits:              8,
+		StopBits:              1,
+		MinimumReadSize:       0,
+		InterCharacterTimeout: 100,
 	}
 
-	serial, err := serial.Open(options)
-	if err != nil {
-		fmt.Println(err)
+	serial, openErr := serial.Open(options)
+	if openErr != nil {
+		fmt.Println(openErr)
 		os.Exit(1)
 	}
 
 	network := dynamixel.NewNetwork(serial)
 	servo := dynamixel.NewServo(network, uint8(*servoId))
-	led := false
 
+	pingErr := servo.Ping()
+	if pingErr != nil {
+		fmt.Println(pingErr)
+		os.Exit(1)
+	}
+
+	led := false
 	for {
 		led = !led
 		servo.SetLed(led)

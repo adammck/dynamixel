@@ -21,7 +21,8 @@ func main() {
     BaudRate: 1000000,
     DataBits: 8,
     StopBits: 1,
-    MinimumReadSize: 1,
+    MinimumReadSize: 0,
+    InterCharacterTimeout: 100,
   }
 
   serial, openErr := serial.Open(options); if openErr != nil {
@@ -30,6 +31,10 @@ func main() {
 
   network := dynamixel.NewNetwork(serial)
   servo := dynamixel.NewServo(network, 1)
+
+  pingErr := servo.Ping(); if pingErr != nil {
+    log.Fatalf("error pinging servo: %v\n", pingErr)
+  }
 
   moveErr := servo.SetGoalPosition(512); if moveErr != nil {
     log.Fatalf("error setting goal position: %v\n", moveErr)

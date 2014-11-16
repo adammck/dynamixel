@@ -142,6 +142,9 @@ func (network *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte,
 //
 // Reads `b` bytes, blocking if they're not immediately available.
 //
+// TODO(adammck): Add a timeout parameter, so instructions which we know might
+//                fail (e.g. PING) can do so gracefully, rather than hanging.
+//
 func (network *DynamixelNetwork) read(b int) ([]byte, error) {
 	buf := make([]byte, b)
 	n := 0
@@ -254,6 +257,26 @@ func (network *DynamixelNetwork) ReadStatusPacket(expectIdent uint8) ([]byte, er
 	// omg, nothing went wrong
 
 	return paramsBuf, nil
+}
+
+// Ping sends the PING instruction to the given Servo ID, and waits for the
+// response. Returns an error if the ping fails, or nil if it succeeds.
+func (n *DynamixelNetwork) Ping(ident uint8) error {
+	n.Log("Ping(%d)", ident)
+
+	writeErr := n.WriteInstruction(ident, Ping)
+	if writeErr != nil {
+		return writeErr
+	}
+
+	// There's no way to disable the status packet for PING commands, so always
+	// wait for it. That's how we know that the servo is responding.
+	_, readErr := n.ReadStatusPacket(ident)
+	if readErr != nil {
+		return readErr
+	}
+
+	return nil
 }
 
 func (n *DynamixelNetwork) ReadData(ident uint8, startAddress byte, length int) (uint16, error) {

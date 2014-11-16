@@ -40,6 +40,12 @@ func NewServo(network *DynamixelNetwork, ident uint8) *DynamixelServo {
 		Ident:     ident,
 		zeroAngle: 150,
 	}
+
+// Ping sends the PING instruction to servo, and waits for the response. Returns
+// nil if the ping succeeds, otherwise an error. It's optional, but a very good
+// idea, to call this before sending any other instructions to the servo.
+func (servo *DynamixelServo) Ping() error {
+	return servo.Network.Ping(servo.Ident)
 }
 
 // Converts a bool to an int.
