@@ -300,7 +300,7 @@ func (n *DynamixelNetwork) ReadData(ident uint8, startAddress byte, length int) 
 	return val, nil
 }
 
-func (n *DynamixelNetwork) WriteData(ident uint8, params ...byte) error {
+func (n *DynamixelNetwork) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {
 	var instruction byte
 
 	if n.Buffered {
@@ -314,9 +314,11 @@ func (n *DynamixelNetwork) WriteData(ident uint8, params ...byte) error {
 		return writeErr
 	}
 
-	_, readErr := n.ReadStatusPacket(ident)
-	if readErr != nil {
-		return readErr
+	if expectStausPacket {
+		_, readErr := n.ReadStatusPacket(ident)
+		if readErr != nil {
+			return readErr
+		}
 	}
 
 	return nil

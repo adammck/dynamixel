@@ -2,17 +2,19 @@ package dynamixel
 
 import (
 	"errors"
+	"fmt"
 	"math"
 )
 
 const (
 
 	// Control Table Addresses
-	addrTorqueEnable byte = 0x18 // 1
-	addrLed          byte = 0x19 // 1
-	addrGoalPosition byte = 0x1E // 2
-	addrMovingSpeed  byte = 0x20 // 2
-	addrTorqueLimit  byte = 0x22 // 2
+	addrStatusReturnLevel byte = 0x10 // 1
+	addrTorqueEnable      byte = 0x18 // 1
+	addrLed               byte = 0x19 // 1
+	addrGoalPosition      byte = 0x1E // 2
+	addrMovingSpeed       byte = 0x20 // 2
+	addrTorqueLimit       byte = 0x22 // 2
 
 	// Read Only
 	addrCurrentPosition byte = 0x24 // 2
@@ -31,15 +33,26 @@ type DynamixelServo struct {
 	Network   *DynamixelNetwork
 	Ident     uint8
 	zeroAngle float64
+
+	// Cache of control table values
+	statusReturnLevel int
 }
 
 // http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm
 func NewServo(network *DynamixelNetwork, ident uint8) *DynamixelServo {
-	return &DynamixelServo{
-		Network:   network,
-		Ident:     ident,
-		zeroAngle: 150,
+	s := &DynamixelServo{
+		Network:           network,
+		Ident:             ident,
+		zeroAngle:         150,
+		statusReturnLevel: 2,
 	}
+
+	return s
+}
+
+func (servo *DynamixelServo) Read(startAddress byte, length int) (uint16, error) {
+	return servo.Network.ReadData(servo.Ident, startAddress, length)
+}
 
 // Ping sends the PING instruction to servo, and waits for the response. Returns
 // nil if the ping succeeds, otherwise an error. It's optional, but a very good
@@ -65,11 +78,14 @@ func high(i int) byte {
 }
 
 func (servo *DynamixelServo) readData(startAddress byte, length int) (uint16, error) {
+	if servo.statusReturnLevel == 0 {
+		return 0, errors.New("can't READ while Status Return Level is zero")
+	}
 	return servo.Network.ReadData(servo.Ident, startAddress, length)
 }
 
 func (servo *DynamixelServo) writeData(params ...byte) error {
-	return servo.Network.WriteData(servo.Ident, params...)
+	return servo.Network.WriteData(servo.Ident, (servo.statusReturnLevel == 2), params...)
 }
 
 func posDistance(a uint16, b uint16) uint16 {
@@ -175,6 +191,33 @@ func (servo *DynamixelServo) SetTorqueLimit(limit int) error {
 		return errors.New("torque limit out of range")
 	}
 	return servo.writeData(addrTorqueLimit, low(limit), high(limit))
+}
+
+// Sets the status return level. Possible values are:
+//
+// 0 = Only respond to PING commands
+// 1 = Only respond to PING and READ commands
+// 2 = Respond to all commands
+//
+// Servos default to 2, but retain the value so long as they're powered up. This
+// makes it a very good idea to explicitly set the value after connecting, to
+// avoid waiting for status packets which will never arrive.
+//
+// See: dxl_ax_actuator.htm#Actuator_Address_10
+func (servo *DynamixelServo) SetStatusReturnLevel(value int) error {
+	servo.Network.Log("SetStatusReturnLevel(%d, %d)", servo.Ident, value)
+
+	if value < 0 || value > 2 {
+		return fmt.Errorf("invalid Status Return Level value: %d", value)
+	}
+
+	err := servo.writeData(addrStatusReturnLevel, low(value))
+	if err != nil {
+		return err
+	}
+
+	servo.statusReturnLevel = value
+	return nil
 }
 
 // Returns the current position.
