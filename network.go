@@ -215,14 +215,17 @@ func (network *DynamixelNetwork) ReadStatusPacket(expectIdent uint8) ([]byte, er
 
 	numParams := uint8(paramCountAndErrBitsBuf[0]) - 2
 	errBits := paramCountAndErrBitsBuf[1]
+	paramsBuf := make([]byte, numParams)
 
 	// now read the params, if there are any. we must do this before checking for
 	// errors, to avoid leaving junk in the buffer.
 
-	paramsBuf, paramsErr := network.read(int(numParams))
-	network.Log("<< %#v (params)\n", paramsBuf)
-	if paramsErr != nil {
-		return []byte{}, paramsErr
+	if numParams > 0 {
+		paramsBuf, paramsErr := network.read(int(numParams))
+		network.Log("<< %#v (params)\n", paramsBuf)
+		if paramsErr != nil {
+			return []byte{}, paramsErr
+		}
 	}
 
 	// read the checksum, which is always one byte
