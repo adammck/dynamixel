@@ -224,7 +224,8 @@ func (network *DynamixelNetwork) ReadStatusPacket(expectIdent uint8) ([]byte, er
 	// errors, to avoid leaving junk in the buffer.
 
 	if numParams > 0 {
-		paramsBuf, paramsErr := network.read(int(numParams))
+		var paramsErr error
+		paramsBuf, paramsErr = network.read(int(numParams))
 		network.Log("<< %#v (params)\n", paramsBuf)
 		if paramsErr != nil {
 			return []byte{}, paramsErr
