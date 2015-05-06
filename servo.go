@@ -13,11 +13,11 @@ const (
 	addrStatusReturnLevel byte = 0x10 // 1
 
 	// Control Table Addresses (RAM, Read/Write)
-	addrTorqueEnable      byte = 0x18 // 1
-	addrLed               byte = 0x19 // 1
-	addrGoalPosition      byte = 0x1E // 2
-	addrMovingSpeed       byte = 0x20 // 2
-	addrTorqueLimit       byte = 0x22 // 2
+	addrTorqueEnable byte = 0x18 // 1
+	addrLed          byte = 0x19 // 1
+	addrGoalPosition byte = 0x1E // 2
+	addrMovingSpeed  byte = 0x20 // 2
+	addrTorqueLimit  byte = 0x22 // 2
 
 	// Control Table Addresses (RAM, Read Only)
 	addrCurrentPosition byte = 0x24 // 2
@@ -254,5 +254,5 @@ func (servo *DynamixelServo) SetIdent(ident int) error {
 
 func (servo *DynamixelServo) logMethod(format string, v ...interface{}) {
 	prefix := fmt.Sprintf("servo[%d].", servo.Ident)
-	servo.Network.Log(prefix + format, v...)
+	servo.Network.Log(prefix+format, v...)
 }
