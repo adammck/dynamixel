@@ -2,7 +2,6 @@ package dynamixel
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
@@ -245,6 +244,7 @@ func (network *DynamixelNetwork) ReadStatusPacket(expectIdent uint8) ([]byte, er
 	// TODO: check the checksum
 
 	checksumBuf, checksumErr := network.read(1)
+
 	network.Log("<< %#v (checksum)\n", checksumBuf)
 	if checksumErr != nil {
 		return []byte{}, checksumErr
@@ -289,25 +289,47 @@ func (n *DynamixelNetwork) Ping(ident uint8) error {
 	return nil
 }
 
-func (n *DynamixelNetwork) ReadData(ident uint8, startAddress byte, length int) (uint16, error) {
-	params := []byte{startAddress, byte(length)}
-	err1 := n.WriteInstruction(ident, ReadData, params...)
-	if err1 != nil {
-		return 0, err1
+// ReadData reads a slice of n bytes from the control table of the given servo
+// ID. The ReadInt method is usually more useful.
+func (network *DynamixelNetwork) ReadData(ident uint8, addr byte, n int) ([]byte, error) {
+	params := []byte{addr, byte(n)}
+	err := network.WriteInstruction(ident, ReadData, params...)
+	if err != nil {
+		return []byte{}, err
 	}
 
-	buf, err2 := n.ReadStatusPacket(ident)
-	if err2 != nil {
-		return 0, err2
+	buf, err := network.ReadStatusPacket(ident)
+	if err != nil {
+		return buf, err
 	}
 
-	var val uint16
-	err3 := binary.Read(bytes.NewReader(buf), binary.LittleEndian, &val)
-	if err3 != nil {
-		return 0, err3
+	return buf, nil
+}
+
+// ReadInt reads an unsigned integer from the control table of the given servo
+// ID. Only 8- and 16-bit uints are supported, because those are the only thing
+// the control table contains.
+func (network *DynamixelNetwork) ReadInt(ident uint8, addr byte, n int) (int, error) {
+	if n != 1 && n != 2 {
+		return 0, fmt.Errorf("invalid read length %d", n)
 	}
 
-	return val, nil
+	b, err := network.ReadData(ident, addr, n)
+	if err != nil {
+		return 0, err
+	}
+
+	switch len(b) {
+	case 1:
+		return int(b[0]), nil
+
+	case 2:
+		return int(b[0]) | int(b[1])<<8, nil
+
+	default:
+		return 0, fmt.Errorf("expected %d bytes, got %d", n, len(b))
+
+	}
 }
 
 func (n *DynamixelNetwork) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {

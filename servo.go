@@ -21,6 +21,7 @@ const (
 
 	// Control Table Addresses (RAM, Read Only)
 	addrCurrentPosition byte = 0x24 // 2
+	addrPresentVoltage  byte = 0x2A // 1
 
 	// Limits (from dxl_ax_actuator.htm)
 	maxPos   uint16  = 1023
@@ -76,12 +77,12 @@ func high(i int) byte {
 	return low(i >> 8)
 }
 
-func (servo *DynamixelServo) readData(startAddress byte, length int) (uint16, error) {
+func (servo *DynamixelServo) readInt(addr byte, n int) (int, error) {
 	if servo.statusReturnLevel == 0 {
 		return 0, errors.New("can't READ while Status Return Level is zero")
 	}
 
-	return servo.Network.ReadData(servo.Ident, startAddress, length)
+	return servo.Network.ReadInt(servo.Ident, addr, n)
 }
 
 func (servo *DynamixelServo) writeData(params ...byte) error {
@@ -111,13 +112,12 @@ func normalizeAngle(d float64) float64 {
 //    These methods should provide as useful and friendly of an interface to the
 //    servo as possible.
 
-func (servo *DynamixelServo) posToAngle(pos uint16) float64 {
+func (servo *DynamixelServo) posToAngle(pos int) float64 {
 	return (positionToAngle * float64(pos)) - servo.zeroAngle
 }
 
-func (servo *DynamixelServo) angleToPos(angle float64) uint16 {
-	pos := uint16((servo.zeroAngle + angle) * angleToPosition)
-	return pos
+func (servo *DynamixelServo) angleToPos(angle float64) int {
+	return int((servo.zeroAngle + angle) * angleToPosition)
 }
 
 // Sets the origin angle (in degrees).
@@ -147,7 +147,7 @@ func (servo *DynamixelServo) Angle() (float64, error) {
 // If the angle is out of bounds
 //
 func (servo *DynamixelServo) MoveTo(angle float64) error {
-	pos := int(servo.angleToPos(normalizeAngle(angle)))
+	pos := servo.angleToPos(normalizeAngle(angle))
 	return servo.SetGoalPosition(pos)
 }
 
@@ -228,9 +228,21 @@ func (servo *DynamixelServo) SetStatusReturnLevel(value int) error {
 	return nil
 }
 
+// Voltage returns the current voltage supplied. Unlike the underlying Dynamixel
+// interface, this is the actual voltage, not multiplied by ten.
+func (servo *DynamixelServo) Voltage() (float64, error) {
+	volts, err := servo.readInt(addrPresentVoltage, 1)
+	if err != nil {
+		return 0.0, err
+	}
+
+	// Convert the return value into actual volts.
+	return (float64(volts) / 10), nil
+}
+
 // Returns the current position.
-func (servo *DynamixelServo) Position() (uint16, error) {
-	return servo.readData(addrCurrentPosition, 2)
+func (servo *DynamixelServo) Position() (int, error) {
+	return servo.readInt(addrCurrentPosition, 2)
 }
 
 // Changes the identity of the servo.
