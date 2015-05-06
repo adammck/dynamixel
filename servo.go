@@ -8,7 +8,8 @@ import (
 
 const (
 
-	// Control Table Addresses
+	// Control Table Addresses (EEPROM)
+	addrID                byte = 0x03 // 1
 	addrStatusReturnLevel byte = 0x10 // 1
 	addrTorqueEnable      byte = 0x18 // 1
 	addrLed               byte = 0x19 // 1
@@ -48,10 +49,6 @@ func NewServo(network *DynamixelNetwork, ident uint8) *DynamixelServo {
 	}
 
 	return s
-}
-
-func (servo *DynamixelServo) Read(startAddress byte, length int) (uint16, error) {
-	return servo.Network.ReadData(servo.Ident, startAddress, length)
 }
 
 // Ping sends the PING instruction to servo, and waits for the response. Returns
@@ -223,4 +220,23 @@ func (servo *DynamixelServo) SetStatusReturnLevel(value int) error {
 // Returns the current position.
 func (servo *DynamixelServo) Position() (uint16, error) {
 	return servo.readData(addrCurrentPosition, 2)
+}
+
+// Changes the identity of the servo.
+// This is stored in EEPROM, so will persist between reboots.
+func (servo *DynamixelServo) SetIdent(ident int) error {
+	servo.LogMethod("SetIdent(%d, %d)", ident)
+	i := low(ident)
+
+	if i < 0 || i > 252 {
+		return fmt.Errorf("invalid ID (must be 0-252): %d", i)
+	}
+
+	err := servo.writeData(addrID, i)
+	if err != nil {
+		return err
+	}
+
+	servo.Ident = i
+	return nil
 }
