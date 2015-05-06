@@ -208,7 +208,11 @@ func (servo *DynamixelServo) SetStatusReturnLevel(value int) error {
 		return fmt.Errorf("invalid Status Return Level value: %d", value)
 	}
 
-	err := servo.writeData(addrStatusReturnLevel, low(value))
+	// Call Network.WriteData directly, rather than via servo.writeData, because
+	// the return status level will depend upon the new level, rather than the
+	// current level cache. We don't want to update that until we're sure that
+	// the write was successful.
+	err := servo.Network.WriteData(servo.Ident, (value == 2), addrStatusReturnLevel, low(value))
 	if err != nil {
 		return err
 	}
