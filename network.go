@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"strings"
+	"time"
 )
 
 const (
@@ -28,6 +29,9 @@ type DynamixelNetwork struct {
 	Serial   io.ReadWriteCloser
 	Buffered bool
 	Debug    bool
+
+	// The time to wait for a single read to complete before giving up.
+	Timeout time.Duration
 }
 
 func NewNetwork(serial io.ReadWriteCloser) *DynamixelNetwork {
@@ -35,6 +39,7 @@ func NewNetwork(serial io.ReadWriteCloser) *DynamixelNetwork {
 		Serial:   serial,
 		Buffered: false,
 		Debug:    false,
+		Timeout:  100 * time.Millisecond,
 	}
 }
 
@@ -140,23 +145,27 @@ func (network *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte,
 }
 
 //
-// Reads `b` bytes, blocking if they're not immediately available.
+// Reads `n` bytes, blocking if they're not immediately available. Returns a
+// slice containing the bytes read. If the network timeout is reached, returns
+// the bytes read so far (which might be none) and an error.
 //
-// TODO(adammck): Add a timeout parameter, so instructions which we know might
-//                fail (e.g. PING) can do so gracefully, rather than hanging.
-//
-func (network *DynamixelNetwork) read(b int) ([]byte, error) {
-	buf := make([]byte, b)
-	n := 0
+func (network *DynamixelNetwork) read(n int) ([]byte, error) {
+	start := time.Now()
+	buf := make([]byte, n)
+	m := 0
 
-	for n < b {
-		nn, err := network.Serial.Read(buf[n:])
-		n += nn
+	for m < n {
+		n, err := network.Serial.Read(buf[m:])
+		m += n
 
 		// It's okay if we reached the end of the available bytes. They're probably
 		// just not available yet. Other errors are fatal.
 		if err != nil && err != io.EOF {
 			return buf, err
+		}
+
+		if time.Since(start) >= network.Timeout {
+			return buf, fmt.Errorf("read timed out")
 		}
 	}
 
