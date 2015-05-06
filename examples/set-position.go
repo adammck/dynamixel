@@ -6,13 +6,12 @@ import (
 	"github.com/adammck/dynamixel"
 	"github.com/jacobsa/go-serial/serial"
 	"os"
-	"time"
 )
 
 var (
 	portName = flag.String("port", "/dev/tty.usbserial-A9ITPZVR", "the serial port path")
-	servoId  = flag.Int("id", 1, "the ID of the servo to flash")
-	interval = flag.Int("interval", 200, "the time between flashes (ms)")
+	servoId  = flag.Int("id", 1, "the ID of the servo to move")
+	position = flag.Int("position", 512, "the goal position to set")
 	debug    = flag.Bool("debug", false, "show serial traffic")
 )
 
@@ -30,7 +29,7 @@ func main() {
 
 	serial, openErr := serial.Open(options)
 	if openErr != nil {
-		fmt.Println(openErr)
+		fmt.Printf("open error: %s\n", openErr)
 		os.Exit(1)
 	}
 
@@ -38,17 +37,15 @@ func main() {
 	network.Debug = *debug
 
 	servo := dynamixel.NewServo(network, uint8(*servoId))
-
 	pingErr := servo.Ping()
 	if pingErr != nil {
-		fmt.Println(pingErr)
+		fmt.Println("ping error: %s\n", pingErr)
 		os.Exit(1)
 	}
 
-	led := false
-	for {
-		led = !led
-		servo.SetLed(led)
-		time.Sleep(time.Duration(*interval) * time.Millisecond)
+	moveErr := servo.SetGoalPosition(*position)
+	if moveErr != nil {
+		fmt.Println("move error: %s\n", moveErr)
+		os.Exit(1)
 	}
 }
