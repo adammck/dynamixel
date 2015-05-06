@@ -11,13 +11,15 @@ const (
 	// Control Table Addresses (EEPROM)
 	addrID                byte = 0x03 // 1
 	addrStatusReturnLevel byte = 0x10 // 1
+
+	// Control Table Addresses (RAM, Read/Write)
 	addrTorqueEnable      byte = 0x18 // 1
 	addrLed               byte = 0x19 // 1
 	addrGoalPosition      byte = 0x1E // 2
 	addrMovingSpeed       byte = 0x20 // 2
 	addrTorqueLimit       byte = 0x22 // 2
 
-	// Read Only
+	// Control Table Addresses (RAM, Read Only)
 	addrCurrentPosition byte = 0x24 // 2
 
 	// Limits (from dxl_ax_actuator.htm)
@@ -78,6 +80,7 @@ func (servo *DynamixelServo) readData(startAddress byte, length int) (uint16, er
 	if servo.statusReturnLevel == 0 {
 		return 0, errors.New("can't READ while Status Return Level is zero")
 	}
+
 	return servo.Network.ReadData(servo.Ident, startAddress, length)
 }
 
@@ -157,11 +160,13 @@ func (servo *DynamixelServo) MoveTo(angle float64) error {
 
 // Enables or disables torque.
 func (servo *DynamixelServo) SetTorqueEnable(state bool) error {
+	servo.logMethod("SetTorqueEnable(%t)", state)
 	return servo.writeData(addrTorqueEnable, btoi(state))
 }
 
 // Enables or disables the LED.
 func (servo *DynamixelServo) SetLed(state bool) error {
+	servo.logMethod("SetLed(%t)", state)
 	return servo.writeData(addrLed, btoi(state))
 }
 
@@ -184,6 +189,8 @@ func (servo *DynamixelServo) SetMovingSpeed(speed int) error {
 
 // Sets the torque limit.
 func (servo *DynamixelServo) SetTorqueLimit(limit int) error {
+	servo.logMethod("SetTorqueLimit(%d)", limit)
+
 	if limit < 0 || limit > 1023 {
 		return errors.New("torque limit out of range")
 	}
@@ -202,7 +209,7 @@ func (servo *DynamixelServo) SetTorqueLimit(limit int) error {
 //
 // See: dxl_ax_actuator.htm#Actuator_Address_10
 func (servo *DynamixelServo) SetStatusReturnLevel(value int) error {
-	servo.Network.Log("SetStatusReturnLevel(%d, %d)", servo.Ident, value)
+	servo.logMethod("SetStatusReturnLevel(%d)", value)
 
 	if value < 0 || value > 2 {
 		return fmt.Errorf("invalid Status Return Level value: %d", value)
@@ -229,7 +236,7 @@ func (servo *DynamixelServo) Position() (uint16, error) {
 // Changes the identity of the servo.
 // This is stored in EEPROM, so will persist between reboots.
 func (servo *DynamixelServo) SetIdent(ident int) error {
-	servo.LogMethod("SetIdent(%d, %d)", ident)
+	servo.logMethod("SetIdent(%d, %d)", ident)
 	i := low(ident)
 
 	if i < 0 || i > 252 {
@@ -243,4 +250,9 @@ func (servo *DynamixelServo) SetIdent(ident int) error {
 
 	servo.Ident = i
 	return nil
+}
+
+func (servo *DynamixelServo) logMethod(format string, v ...interface{}) {
+	prefix := fmt.Sprintf("servo[%d].", servo.Ident)
+	servo.Network.Log(prefix + format, v...)
 }
