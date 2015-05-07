@@ -27,9 +27,9 @@ func main() {
 		InterCharacterTimeout: 100,
 	}
 
-	serial, openErr := serial.Open(options)
-	if openErr != nil {
-		fmt.Printf("open error: %s\n", openErr)
+	serial, err := serial.Open(options)
+	if err != nil {
+		fmt.Printf("open error: %s\n", err)
 		os.Exit(1)
 	}
 
@@ -37,15 +37,15 @@ func main() {
 	network.Debug = *debug
 
 	servo := dynamixel.NewServo(network, uint8(*servoId))
-	pingErr := servo.Ping()
-	if pingErr != nil {
-		fmt.Println("ping error: %s\n", pingErr)
+	err = servo.Ping()
+	if err != nil {
+		fmt.Println("ping error: %s\n", err)
 		os.Exit(1)
 	}
 
-	moveErr := servo.SetGoalPosition(*position)
-	if moveErr != nil {
-		fmt.Println("move error: %s\n", moveErr)
+	err = servo.SetGoalPosition(*position)
+	if err != nil {
+		fmt.Println("move error: %s\n", err)
 		os.Exit(1)
 	}
 }

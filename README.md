@@ -1,7 +1,8 @@
 # Dynamixel
 
-This packages provides a Go interface to Dynamixel servos. It's brand new, but
-some things kind of work.
+This packages provides a Go interface to Dynamixel servos. It's incomplete, but
+the important stuff works. It's only tested against AX-12A servos (because I am
+a cheapskate), but probably works with other AX models.
 
 
 ## Example
@@ -25,19 +26,22 @@ func main() {
     InterCharacterTimeout: 100,
   }
 
-  serial, openErr := serial.Open(options); if openErr != nil {
-    log.Fatalf("error opening serial port: %v\n", openErr)
+  serial, err := serial.Open(options)
+  if err != nil {
+    log.Fatalf("error opening serial port: %v\n", err)
   }
 
   network := dynamixel.NewNetwork(serial)
   servo := dynamixel.NewServo(network, 1)
 
-  pingErr := servo.Ping(); if pingErr != nil {
-    log.Fatalf("error pinging servo: %v\n", pingErr)
+  err = servo.Ping()
+  if err != nil {
+    log.Fatalf("error pinging servo: %v\n", err)
   }
 
-  moveErr := servo.SetGoalPosition(512); if moveErr != nil {
-    log.Fatalf("error setting goal position: %v\n", moveErr)
+  err = servo.SetGoalPosition(512)
+  if err != nil {
+    log.Fatalf("error setting goal position: %v\n", err)
   }
 }
 ```
