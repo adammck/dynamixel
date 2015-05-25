@@ -8,6 +8,9 @@ import (
 
 const (
 
+	// Control table size (in bytes)
+	tableSize = 50
+
 	// Control Table Addresses (EEPROM)
 	addrID                byte = 0x03 // 1
 	addrStatusReturnLevel byte = 0x10 // 1
@@ -33,17 +36,27 @@ const (
 	angleToPosition float64 = 1 / positionToAngle        // 3.41
 )
 
+// Networker provides an interface to the underlying servos' control tables.
+type Networker interface {
+	Ping(uint8) error
+	ReadData(uint8, byte, int) ([]byte, error)
+	ReadInt(uint8, byte, int) (int, error)
+	WriteData(uint8, bool, ...byte) error
+	Log(string, ...interface{})
+}
+
 type DynamixelServo struct {
-	Network   *DynamixelNetwork
+	Network   Networker
 	Ident     uint8
 	zeroAngle float64
 
 	// Cache of control table values
+	cache             [tableSize]byte
 	statusReturnLevel int
 }
 
 // http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm
-func NewServo(network *DynamixelNetwork, ident uint8) *DynamixelServo {
+func NewServo(network Networker, ident uint8) *DynamixelServo {
 	s := &DynamixelServo{
 		Network:           network,
 		Ident:             ident,
@@ -52,6 +65,28 @@ func NewServo(network *DynamixelNetwork, ident uint8) *DynamixelServo {
 	}
 
 	return s
+}
+
+// updateCache reads the entire control table from the servo, and stores it in
+// the cache.
+func (servo *DynamixelServo) updateCache() error {
+	b, err := servo.Network.ReadData(servo.Ident, 0x0, tableSize)
+	if err != nil {
+		return err
+	}
+
+	// Ensure that the returned slice is the right size.
+	if len(b) != tableSize {
+		return fmt.Errorf("invalid control table size: %d (expected %d)", len(b), tableSize)
+	}
+
+	// Copy each byte to the cache.
+	// TODO: Surely there is a better way to do this.
+	for i := 0; i < tableSize; i++ {
+		servo.cache[i] = b[i]
+	}
+
+	return nil
 }
 
 // Ping sends the PING instruction to servo, and waits for the response. Returns
