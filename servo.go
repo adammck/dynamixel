@@ -89,6 +89,17 @@ func (servo *DynamixelServo) updateCache() error {
 	return nil
 }
 
+// getRegister fetches the value of a register from the cache.
+func (servo *DynamixelServo) getRegister(reg Register) (int, error) {
+	v := int(servo.cache[reg.address])
+
+	if reg.length == 2 {
+		v |= int(servo.cache[reg.address + 1])<<8
+	}
+
+	return v, nil
+}
+
 // Ping sends the PING instruction to servo, and waits for the response. Returns
 // nil if the ping succeeds, otherwise an error. It's optional, but a very good
 // idea, to call this before sending any other instructions to the servo.
