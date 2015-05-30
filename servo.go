@@ -100,6 +100,30 @@ func (servo *DynamixelServo) getRegister(reg Register) (int, error) {
 	return v, nil
 }
 
+// setRegister writes a value to the given register. Returns an error if the
+// register is read only or if the write failed.
+func (servo *DynamixelServo) setRegister(reg Register, value int) error {
+	if reg.access == ro {
+		return fmt.Errorf("can't write to a read-only register")
+	}
+
+	switch reg.length {
+	case 1:
+		servo.writeData(reg.address, low(value))
+		servo.cache[reg.address] = low(value)
+
+	case 2:
+		servo.writeData(reg.address, low(value), high(value))
+		servo.cache[reg.address] = low(value)
+		servo.cache[reg.address+1] = high(value)
+
+	default:
+		return fmt.Errorf("invalid register length: %d", reg.length)
+	}
+
+	return nil
+}
+
 // Ping sends the PING instruction to servo, and waits for the response. Returns
 // nil if the ping succeeds, otherwise an error. It's optional, but a very good
 // idea, to call this before sending any other instructions to the servo.
@@ -131,6 +155,7 @@ func (servo *DynamixelServo) readInt(addr byte, n int) (int, error) {
 	return servo.Network.ReadInt(servo.Ident, addr, n)
 }
 
+// TODO: Remove this in favor of setRegister?
 func (servo *DynamixelServo) writeData(params ...byte) error {
 	return servo.Network.WriteData(servo.Ident, (servo.statusReturnLevel == 2), params...)
 }
