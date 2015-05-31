@@ -91,13 +91,43 @@ func (servo *DynamixelServo) updateCache() error {
 
 // getRegister fetches the value of a register from the cache.
 func (servo *DynamixelServo) getRegister(reg Register) (int, error) {
-	v := int(servo.cache[reg.address])
-
-	if reg.length == 2 {
-		v |= int(servo.cache[reg.address + 1])<<8
+	if reg.length != 1 && reg.length != 2 {
+		return 0, fmt.Errorf("invalid register length: %d", reg.length)
 	}
 
-	return v, nil
+	if reg.cacheable {
+		v := int(servo.cache[reg.address])
+
+		if reg.length == 2 {
+			v |= int(servo.cache[reg.address+1]) << 8
+		}
+
+		return v, nil
+	} else {
+		if servo.statusReturnLevel == 0 {
+			return 0, errors.New("can't READ while Status Return Level is zero")
+		}
+
+		b, err := servo.Network.ReadData(servo.Ident, reg.address, reg.length)
+		if err != nil {
+			return 0, err
+		}
+
+		switch len(b) {
+		case 1:
+			servo.cache[reg.address] = b[0]
+			return int(b[0]), nil
+
+		case 2:
+			servo.cache[reg.address] = b[0]
+			servo.cache[reg.address+1] = b[1]
+			return int(b[0]) | int(b[1])<<8, nil
+
+		default:
+			return 0, fmt.Errorf("expected %d bytes, got %d", reg.length, len(b))
+
+		}
+	}
 }
 
 // setRegister writes a value to the given register. Returns an error if the

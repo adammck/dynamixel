@@ -25,7 +25,7 @@ func (n *mockNetwork) ReadInt(ident uint8, addr byte, count int) (int, error) {
 func (n *mockNetwork) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {
 	addr := int(params[0])
 
-	for i, val := range(params[1:]) {
+	for i, val := range params[1:] {
 		n.controlTable[addr+i] = val
 	}
 
@@ -55,22 +55,35 @@ func TestGetRegister(t *testing.T) {
 	n := &mockNetwork{}
 	servo := NewServo(n, 1)
 	servo.cache = [50]byte{
-		0x99, 0x10, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x99, 0x10, 0x20, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	}
 
-	// one byte
-	a, err := servo.getRegister(Register{0x00, 1, ro})
+	// invalid register length
+	x, err := servo.getRegister(Register{0x00, 3, ro, true})
+	assert.Error(t, err)
+	assert.Equal(t, 0, x)
+
+	// one byte (cached)
+	a, err := servo.getRegister(Register{0x00, 1, ro, true})
 	assert.Nil(t, err)
 	assert.Equal(t, 0x99, a)
 
-	// two bytes
-	b, err := servo.getRegister(Register{0x01, 2, ro})
+	// two bytes (cached)
+	b, err := servo.getRegister(Register{0x01, 2, ro, true})
 	assert.Nil(t, err)
 	assert.Equal(t, 0x2010, b) // 0x10(L) | 0x20(H)<<8
+
+	// one byte (immediate)
+	servo.cache[0x02] = 0x77
+	n.controlTable[0x02] = 0x88
+	c, err := servo.getRegister(Register{0x02, 1, ro, false})
+	assert.Nil(t, err)
+	assert.Equal(t, 0x88, c)
+	assert.Equal(t, 0x88, servo.cache[0x02], "servo cache should have been updated")
 }
 
 func TestSetRegister(t *testing.T) {
@@ -78,19 +91,19 @@ func TestSetRegister(t *testing.T) {
 	servo := NewServo(n, 1)
 
 	// read only register can't be set
-	err := servo.setRegister(Register{0x00, 1, ro}, 1)
+	err := servo.setRegister(Register{0x00, 1, ro, true}, 1)
 	assert.Equal(t, 0x00, n.controlTable[0])
 	assert.Equal(t, 0x00, servo.cache[0])
 	assert.Error(t, err)
 
 	// read/write single byte
-	err = servo.setRegister(Register{0x01, 1, rw}, 99)
+	err = servo.setRegister(Register{0x01, 1, rw, true}, 99)
 	assert.NoError(t, err)
 	assert.Equal(t, 99, n.controlTable[1], "control table should have been written")
 	assert.Equal(t, 99, servo.cache[1], "servo cache should have been updated")
 
 	// read/write two bytes
-	err = servo.setRegister(Register{0x02, 2, rw}, 4097)
+	err = servo.setRegister(Register{0x02, 2, rw, true}, 4097)
 	assert.NoError(t, err)
 	assert.Equal(t, 0x01, n.controlTable[2], "low byte of control table should have been written")
 	assert.Equal(t, 0x10, n.controlTable[3], "high byte of control table should have been written")
