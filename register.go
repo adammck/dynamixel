@@ -4,9 +4,9 @@ type RegName int
 type Access int
 
 const (
-	ro Access = iota
-	rw
 
+	// Register names are used to refer to a specific value in a servo's EEPROM or
+	// RAM. See the registers variable for the addresses and lengths.
 	modelNumber RegName = iota
 	firmwareVersion
 	servoID
@@ -39,6 +39,11 @@ const (
 	moving
 	lock
 	punch
+
+	// Access Levels specify whether a register is hard-coded into the servo (e.g.
+	// the model number), or is a value which can be changed (e.g. the identity).
+	ro Access = iota
+	rw
 )
 
 type Register struct {
