@@ -5,35 +5,6 @@ import (
 	"testing"
 )
 
-type mockNetwork struct {
-	controlTable [50]byte
-}
-
-func (n *mockNetwork) Ping(ident uint8) error {
-	return nil
-}
-
-func (n *mockNetwork) ReadData(ident uint8, addr byte, count int) ([]byte, error) {
-	return n.controlTable[int(addr) : int(addr)+count], nil
-}
-
-// TODO: Move this into Servo?
-func (n *mockNetwork) ReadInt(ident uint8, addr byte, count int) (int, error) {
-	return 0, nil
-}
-
-func (n *mockNetwork) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {
-	addr := int(params[0])
-
-	for i, val := range params[1:] {
-		n.controlTable[addr+i] = val
-	}
-
-	return nil
-}
-
-func (n *mockNetwork) Log(string, ...interface{}) {}
-
 func TestUpdateCache(t *testing.T) {
 	n := &mockNetwork{}
 	n.controlTable = [50]byte{
@@ -130,4 +101,47 @@ func TestPosition(t *testing.T) {
 	val, err := servo.Position()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, val)
+}
+
+func TestVoltage(t *testing.T) {
+	n := &mockNetwork{}
+	n.controlTable[42] = 95
+	servo := NewServo(n, 1)
+	val, err := servo.Voltage()
+	assert.NoError(t, err)
+	assert.Equal(t, 9.5, val)
+}
+
+// -----------------------------------------------------------------------------
+
+// MockNetwork provides a fake servo, with a control table which can be read
+// from and written to like a real servo.
+type mockNetwork struct {
+	controlTable [50]byte
+}
+
+func (n *mockNetwork) Ping(ident uint8) error {
+	return nil
+}
+
+func (n *mockNetwork) ReadData(ident uint8, addr byte, count int) ([]byte, error) {
+	return n.controlTable[int(addr) : int(addr)+count], nil
+}
+
+// TODO: Move this into Servo?
+func (n *mockNetwork) ReadInt(ident uint8, addr byte, count int) (int, error) {
+	return 0, nil
+}
+
+func (n *mockNetwork) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {
+	addr := int(params[0])
+
+	for i, val := range params[1:] {
+		n.controlTable[addr+i] = val
+	}
+
+	return nil
+}
+
+func (n *mockNetwork) Log(string, ...interface{}) {
 }

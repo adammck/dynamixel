@@ -83,7 +83,7 @@ func init() {
 		presentPosition:         {0x24, 2, ro, false},
 		presentSpeed:            {0x26, 2, ro, true},
 		presentLoad:             {0x28, 2, ro, true},
-		presentVoltage:          {0x2a, 1, ro, true},
+		presentVoltage:          {0x2a, 1, ro, false},
 		presentTemperature:      {0x2b, 1, ro, true},
 		registered:              {0x2c, 1, ro, true},
 		moving:                  {0x2e, 1, ro, true},

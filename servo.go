@@ -22,10 +22,6 @@ const (
 	addrMovingSpeed  byte = 0x20 // 2
 	addrTorqueLimit  byte = 0x22 // 2
 
-	// Control Table Addresses (RAM, Read Only)
-	addrCurrentPosition byte = 0x24 // 2
-	addrPresentVoltage  byte = 0x2A // 1
-
 	// Limits (from dxl_ax_actuator.htm)
 	maxPos   uint16  = 1023
 	maxSpeed uint16  = 1023
@@ -216,6 +212,18 @@ func (servo *DynamixelServo) Position() (int, error) {
 	return servo.getRegister(*registers[presentPosition])
 }
 
+// Voltage returns the current voltage supplied. Unlike the underlying register,
+// this is the actual voltage, not multiplied by ten.
+func (servo *DynamixelServo) Voltage() (float64, error) {
+	val, err := servo.getRegister(*registers[presentVoltage])
+	if err != nil {
+		return 0.0, err
+	}
+
+	// Convert the return value into actual volts.
+	return (float64(val) / 10), nil
+}
+
 //
 // -- High-level interface
 //
@@ -336,18 +344,6 @@ func (servo *DynamixelServo) SetStatusReturnLevel(value int) error {
 
 	servo.statusReturnLevel = value
 	return nil
-}
-
-// Voltage returns the current voltage supplied. Unlike the underlying Dynamixel
-// interface, this is the actual voltage, not multiplied by ten.
-func (servo *DynamixelServo) Voltage() (float64, error) {
-	volts, err := servo.readInt(addrPresentVoltage, 1)
-	if err != nil {
-		return 0.0, err
-	}
-
-	// Convert the return value into actual volts.
-	return (float64(volts) / 10), nil
 }
 
 // Changes the identity of the servo.
