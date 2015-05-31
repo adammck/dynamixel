@@ -110,3 +110,14 @@ func TestSetRegister(t *testing.T) {
 	assert.Equal(t, 0x01, servo.cache[2], "low byte of servo cache should have been updated")
 	assert.Equal(t, 0x10, servo.cache[3], "high byte of servo cache should have been updated")
 }
+
+func TestModelNumber(t *testing.T) {
+	n := &mockNetwork{}
+	n.controlTable[0] = 0x02
+	n.controlTable[1] = 0x01
+	servo := NewServo(n, 1)
+	servo.updateCache()
+	val, err := servo.ModelNumber()
+	assert.NoError(t, err)
+	assert.Equal(t, 258, val)
+}

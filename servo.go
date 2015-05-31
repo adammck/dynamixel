@@ -207,6 +207,10 @@ func normalizeAngle(d float64) float64 {
 	}
 }
 
+func (servo *DynamixelServo) ModelNumber() (int, error) {
+	return servo.getRegister(*registers[modelNumber])
+}
+
 //
 // -- High-level interface
 //
