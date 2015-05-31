@@ -121,3 +121,13 @@ func TestModelNumber(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 258, val)
 }
+
+func TestPosition(t *testing.T) {
+	n := &mockNetwork{}
+	n.controlTable[36] = 0x01
+	n.controlTable[37] = 0x00
+	servo := NewServo(n, 1)
+	val, err := servo.Position()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, val)
+}

@@ -211,6 +211,11 @@ func (servo *DynamixelServo) ModelNumber() (int, error) {
 	return servo.getRegister(*registers[modelNumber])
 }
 
+// Returns the current position.
+func (servo *DynamixelServo) Position() (int, error) {
+	return servo.getRegister(*registers[presentPosition])
+}
+
 //
 // -- High-level interface
 //
@@ -343,11 +348,6 @@ func (servo *DynamixelServo) Voltage() (float64, error) {
 
 	// Convert the return value into actual volts.
 	return (float64(volts) / 10), nil
-}
-
-// Returns the current position.
-func (servo *DynamixelServo) Position() (int, error) {
-	return servo.readInt(addrCurrentPosition, 2)
 }
 
 // Changes the identity of the servo.

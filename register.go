@@ -80,7 +80,7 @@ func init() {
 		goalPosition:            {0x1e, 2, rw, true},
 		movingSpeed:             {0x20, 2, rw, true},
 		torqueLimit:             {0x22, 2, rw, true},
-		presentPosition:         {0x24, 2, ro, true},
+		presentPosition:         {0x24, 2, ro, false},
 		presentSpeed:            {0x26, 2, ro, true},
 		presentLoad:             {0x28, 2, ro, true},
 		presentVoltage:          {0x2a, 1, ro, true},
