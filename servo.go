@@ -18,7 +18,6 @@ const (
 	addrStatusReturnLevel byte = 0x10 // 1
 
 	// Control Table Addresses (RAM, Read/Write)
-	addrTorqueEnable byte = 0x18 // 1
 	addrLed          byte = 0x19 // 1
 	addrGoalPosition byte = 0x1E // 2
 	addrMovingSpeed  byte = 0x20 // 2
@@ -216,6 +215,55 @@ func normalizeAngle(d float64) float64 {
 	}
 }
 
+
+
+
+//
+// -- Registers
+//
+//    These methods are getters for the various registers in the control table.
+//    Some of them (where register.cacheable == true) just read from the cache,
+//    while others read the actual control table every time.
+//
+//
+// TODO: Each of the following registers should have a corresponding reader, and
+//       the R/W registers (marked with an asterisk) should have a writer. They
+//       should all receive and return ints or bools, rather than bytes.
+//
+// modelNumber
+// firmwareVersion
+// servoID*
+// baudRate*
+// returnDelayTime*
+// cwAngleLimit*
+// ccwAngleLimit*
+// highestLimitTemperature*
+// lowestLimitVoltage*
+// highestLimitVoltage*
+// maxTorque*
+// statusReturnLevel*
+// alarmLed*
+// alarmShutdown*
+// torqueEnable*
+// led*
+// cwComplianceMargin*
+// ccwComplianceMargin*
+// cwComplianceSlope*
+// ccwComplianceSlope*
+// goalPosition*
+// movingSpeed*
+// torqueLimit*
+// presentPosition
+// presentSpeed
+// presentLoad
+// presentVoltage
+// presentTemperature
+// registered
+// moving
+// lock*
+// punch*
+//
+
 func (servo *DynamixelServo) ModelNumber() (int, error) {
 	return servo.getRegister(*registers[modelNumber])
 }
@@ -247,6 +295,9 @@ func (servo *DynamixelServo) Voltage() (float64, error) {
 	// Convert the return value into actual volts.
 	return (float64(val) / 10), nil
 }
+
+
+
 
 //
 // -- High-level interface
