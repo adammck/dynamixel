@@ -9,6 +9,8 @@ import (
 const (
 
 	// Control table size (in bytes)
+	// TODO: Instead of hard-coding this, maybe calculate the size by finding the
+	//       highest register address and adding its length?
 	tableSize = 50
 
 	// Control Table Addresses (EEPROM)
@@ -48,10 +50,15 @@ type DynamixelServo struct {
 
 	// Cache of control table values
 	cache             [tableSize]byte
+
+	// TODO: Remove this attribute in favor of reading the value from the control
+	//       table cache.
 	statusReturnLevel int
 }
 
-// http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm
+// NewServo returns a new DynamixelServo with its cache populated.
+// TODO: Return a pointer, error tuple! We're currently ignoring the return
+//       value of the updateCache call.
 func NewServo(network Networker, ident uint8) *DynamixelServo {
 	s := &DynamixelServo{
 		Network:           network,
@@ -60,6 +67,7 @@ func NewServo(network Networker, ident uint8) *DynamixelServo {
 		statusReturnLevel: 2,
 	}
 
+	_ = s.updateCache()
 	return s
 }
 

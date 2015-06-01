@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestUpdateCache(t *testing.T) {
+func TestCacheIsPopulated(t *testing.T) {
 	n := &mockNetwork{}
 	n.controlTable = [50]byte{
 		0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
@@ -16,9 +16,6 @@ func TestUpdateCache(t *testing.T) {
 	}
 
 	servo := NewServo(n, 1)
-	err := servo.updateCache()
-
-	assert.Nil(t, err)
 	assert.Equal(t, servo.cache, n.controlTable)
 }
 
@@ -87,7 +84,6 @@ func TestModelNumber(t *testing.T) {
 	n.controlTable[0] = 0x02
 	n.controlTable[1] = 0x01
 	servo := NewServo(n, 1)
-	servo.updateCache()
 	val, err := servo.ModelNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, 258, val)

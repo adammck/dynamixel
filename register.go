@@ -53,6 +53,7 @@ type Register struct {
 	cacheable bool
 }
 
+// See: http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm
 var registers map[RegName]*Register
 
 func init() {
