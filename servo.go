@@ -49,7 +49,7 @@ type DynamixelServo struct {
 	zeroAngle float64
 
 	// Cache of control table values
-	cache             [tableSize]byte
+	cache [tableSize]byte
 
 	// TODO: Remove this attribute in favor of reading the value from the control
 	//       table cache.
