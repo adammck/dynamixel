@@ -19,7 +19,6 @@ const (
 
 	// Control Table Addresses (RAM, Read/Write)
 	addrGoalPosition byte = 0x1E // 2
-	addrMovingSpeed  byte = 0x20 // 2
 	addrTorqueLimit  byte = 0x22 // 2
 
 	// Limits (from dxl_ax_actuator.htm)
@@ -244,6 +243,8 @@ func normalizeAngle(d float64) float64 {
 // statusReturnLevel*
 // alarmLed*
 // alarmShutdown*
+// torqueEnable*
+// led*
 // cwComplianceMargin*
 // ccwComplianceMargin*
 // cwComplianceSlope*
@@ -286,6 +287,21 @@ func (servo *DynamixelServo) LED() (bool, error) {
 // Enables or disables the servo's LED.
 func (servo *DynamixelServo) SetLED(state bool) error {
 	return servo.setRegister(*registers[led], btoi(state))
+}
+
+// MovingSpeed returns the current moving speed. This is not the speed at which
+// the motor is moving, it's the speed at which the servo wants to move.
+func (servo *DynamixelServo) MovingSpeed() (int, error) {
+	return servo.getRegister(*registers[movingSpeed])
+}
+
+// Sets the moving speed.
+func (servo *DynamixelServo) SetMovingSpeed(speed int) error {
+	if speed < 0 || speed > int(maxSpeed) {
+		return errors.New("moving speed out of range")
+	}
+
+	return servo.setRegister(*registers[movingSpeed], speed)
 }
 
 // Returns the current position.
@@ -367,14 +383,6 @@ func (servo *DynamixelServo) SetGoalPosition(pos int) error {
 		return errors.New("goal position out of range")
 	}
 	return servo.writeData(addrGoalPosition, low(pos), high(pos))
-}
-
-// Sets the moving speed.
-func (servo *DynamixelServo) SetMovingSpeed(speed int) error {
-	if speed < 0 || speed > int(maxSpeed) {
-		return errors.New("moving speed out of range")
-	}
-	return servo.writeData(addrMovingSpeed, low(speed), high(speed))
 }
 
 // Sets the torque limit.

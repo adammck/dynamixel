@@ -165,6 +165,30 @@ func TestPosition(t *testing.T) {
 	assert.Equal(t, 1, val)
 }
 
+func TestMovingSpeed(t *testing.T) {
+	n := network(map[int]byte{
+		0x20: 0xff, // L
+		0x21: 0x03, // H
+	})
+
+	servo := NewServo(n, 1)
+	val, err := servo.MovingSpeed()
+	assert.NoError(t, err)
+	assert.Equal(t, 1023, val)
+}
+
+func TestSetMovingSpeed(t *testing.T) {
+	n := &mockNetwork{}
+	s := NewServo(n, 1)
+
+	err := s.SetMovingSpeed(513)
+	assert.NoError(t, err)
+	assert.Equal(t, 0x01, n.controlTable[0x20]) // L
+	assert.Equal(t, 0x02, n.controlTable[0x21]) // H
+	assert.Equal(t, 0x01, s.cache[0x20]) // L
+	assert.Equal(t, 0x02, s.cache[0x21]) // H
+}
+
 func TestVoltage(t *testing.T) {
 	n := network(map[int]byte{
 		0x2A: 95,
