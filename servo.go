@@ -18,7 +18,6 @@ const (
 	addrStatusReturnLevel byte = 0x10 // 1
 
 	// Control Table Addresses (RAM, Read/Write)
-	addrLed          byte = 0x19 // 1
 	addrGoalPosition byte = 0x1E // 2
 	addrMovingSpeed  byte = 0x20 // 2
 	addrTorqueLimit  byte = 0x22 // 2
@@ -140,6 +139,7 @@ func (servo *DynamixelServo) setRegister(reg Register, value int) error {
 		return fmt.Errorf("can't write to a read-only register")
 	}
 
+	// TODO: Add log message when setting a register.
 	switch reg.length {
 	case 1:
 		servo.writeData(reg.address, low(value))
@@ -244,8 +244,6 @@ func normalizeAngle(d float64) float64 {
 // statusReturnLevel*
 // alarmLed*
 // alarmShutdown*
-// torqueEnable*
-// led*
 // cwComplianceMargin*
 // ccwComplianceMargin*
 // cwComplianceSlope*
@@ -277,6 +275,17 @@ func (servo *DynamixelServo) TorqueEnable() (bool, error) {
 func (servo *DynamixelServo) SetTorqueEnable(state bool) error {
 	servo.logMethod("SetTorqueEnable(%t)", state)
 	return servo.setRegister(*registers[torqueEnable], btoi(state))
+}
+
+// LED returns the current state of the servo's LED.
+func (servo *DynamixelServo) LED() (bool, error) {
+	v, err := servo.getRegister(*registers[led])
+	return itob(v), err
+}
+
+// Enables or disables the servo's LED.
+func (servo *DynamixelServo) SetLED(state bool) error {
+	return servo.setRegister(*registers[led], btoi(state))
 }
 
 // Returns the current position.
@@ -350,12 +359,6 @@ func (servo *DynamixelServo) MoveTo(angle float64) error {
 //    These methods should follow the Dynamixel protocol docs as closely as
 //    possible, with no fancy stuff.
 //
-
-// Enables or disables the LED.
-func (servo *DynamixelServo) SetLed(state bool) error {
-	servo.logMethod("SetLed(%t)", state)
-	return servo.writeData(addrLed, uint8(btoi(state)))
-}
 
 // Sets the goal position.
 // See: http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm#Actuator_Address_1E

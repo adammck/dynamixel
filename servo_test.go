@@ -123,6 +123,36 @@ func TestSetTorqueEnable(t *testing.T) {
 	assert.Equal(t, 0, s.cache[0x18])
 }
 
+func TestLED(t *testing.T) {
+	n := &mockNetwork{}
+	s := NewServo(n, 1)
+
+	s.cache[0x19] = 0
+	val, err := s.LED()
+	assert.NoError(t, err)
+	assert.Equal(t, false, val)
+
+	s.cache[0x19] = 1
+	val, err = s.LED()
+	assert.NoError(t, err)
+	assert.Equal(t, true, val)
+}
+
+func TestSetLED(t *testing.T) {
+	n := &mockNetwork{}
+	s := NewServo(n, 1)
+
+	err := s.SetLED(true)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, n.controlTable[0x19])
+	assert.Equal(t, 1, s.cache[0x19])
+
+	err = s.SetLED(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, n.controlTable[0x19])
+	assert.Equal(t, 0, s.cache[0x19])
+}
+
 func TestPosition(t *testing.T) {
 	n := network(map[int]byte{
 		0x24: 0x01, // L
