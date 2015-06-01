@@ -92,6 +92,37 @@ func TestModelNumber(t *testing.T) {
 	assert.Equal(t, 258, val)
 }
 
+func TestTorqueEnable(t *testing.T) {
+	n := network(map[int]byte{
+		0x18: 0,
+	})
+
+	s := NewServo(n, 1)
+	val, err := s.TorqueEnable()
+	assert.NoError(t, err)
+	assert.Equal(t, false, val)
+
+	s.cache[0x18] = 1
+	val, err = s.TorqueEnable()
+	assert.NoError(t, err)
+	assert.Equal(t, true, val)
+}
+
+func TestSetTorqueEnable(t *testing.T) {
+	n := &mockNetwork{}
+	s := NewServo(n, 1)
+
+	err := s.SetTorqueEnable(true)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, n.controlTable[0x18])
+	assert.Equal(t, 1, s.cache[0x18])
+
+	err = s.SetTorqueEnable(false)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, n.controlTable[0x18])
+	assert.Equal(t, 0, s.cache[0x18])
+}
+
 func TestPosition(t *testing.T) {
 	n := network(map[int]byte{
 		0x24: 0x01, // L

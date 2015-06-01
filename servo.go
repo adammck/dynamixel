@@ -166,11 +166,16 @@ func (servo *DynamixelServo) Ping() error {
 }
 
 // Converts a bool to an int.
-func btoi(b bool) uint8 {
+func btoi(b bool) int {
 	if b {
 		return 1
 	}
 	return 0
+}
+
+// itob converts an int to a bool.
+func itob(v int) bool {
+	return (v != 0)
 }
 
 func low(i int) byte {
@@ -213,6 +218,17 @@ func normalizeAngle(d float64) float64 {
 
 func (servo *DynamixelServo) ModelNumber() (int, error) {
 	return servo.getRegister(*registers[modelNumber])
+}
+
+func (servo *DynamixelServo) TorqueEnable() (bool, error) {
+	v, err := servo.getRegister(*registers[torqueEnable])
+	return itob(v), err
+}
+
+// Enables or disables torque.
+func (servo *DynamixelServo) SetTorqueEnable(state bool) error {
+	servo.logMethod("SetTorqueEnable(%t)", state)
+	return servo.setRegister(*registers[torqueEnable], btoi(state))
 }
 
 // Returns the current position.
@@ -284,16 +300,10 @@ func (servo *DynamixelServo) MoveTo(angle float64) error {
 //    possible, with no fancy stuff.
 //
 
-// Enables or disables torque.
-func (servo *DynamixelServo) SetTorqueEnable(state bool) error {
-	servo.logMethod("SetTorqueEnable(%t)", state)
-	return servo.writeData(addrTorqueEnable, btoi(state))
-}
-
 // Enables or disables the LED.
 func (servo *DynamixelServo) SetLed(state bool) error {
 	servo.logMethod("SetLed(%t)", state)
-	return servo.writeData(addrLed, btoi(state))
+	return servo.writeData(addrLed, uint8(btoi(state)))
 }
 
 // Sets the goal position.
