@@ -200,6 +200,9 @@ func normalizeAngle(d float64) float64 {
 //       the R/W registers (marked with an asterisk) should have a writer. They
 //       should all receive and return ints or bools, rather than bytes.
 //
+// TODO: These methods should probably be generated from the list of registers,
+//       especially if/when we support multiple models with different sets.
+///
 // modelNumber
 // firmwareVersion
 // servoID*

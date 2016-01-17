@@ -6,6 +6,10 @@ import (
 )
 
 func TestCacheIsPopulated(t *testing.T) {
+
+	// create the mock network first, which contains the (mock) remote control
+	// table. this should be read into the cache when the servo is allocated.
+
 	n := &mockNetwork{
 		[50]byte{
 			0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
@@ -21,15 +25,13 @@ func TestCacheIsPopulated(t *testing.T) {
 }
 
 func TestGetRegister(t *testing.T) {
-	n := &mockNetwork{}
-	servo := NewServo(n, 1)
-	servo.cache = [50]byte{
-		0x99, 0x10, 0x20, 0x88, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	}
+	n, servo := servo(map[int]byte{})
+
+	// pre-populate the CACHE, not the control table
+	servo.cache[0x00] = byte(0x99)
+	servo.cache[0x01] = byte(0x10)
+	servo.cache[0x02] = byte(0x20)
+	servo.cache[0x03] = byte(0x88)
 
 	// invalid register length
 	x, err := servo.getRegister(Register{0x00, 3, ro, true})
@@ -56,8 +58,7 @@ func TestGetRegister(t *testing.T) {
 }
 
 func TestSetRegister(t *testing.T) {
-	n := &mockNetwork{}
-	servo := NewServo(n, 1)
+	n, servo := servo(map[int]byte{})
 
 	// read only register can't be set
 	err := servo.setRegister(Register{0x00, 1, ro, true}, 1)
@@ -83,34 +84,31 @@ func TestSetRegister(t *testing.T) {
 // -- Registers
 
 func TestModelNumber(t *testing.T) {
-	n := network(map[int]byte{
-		0: byte(2), // L
-		1: byte(1), // H
+	_, s := servo(map[int]byte{
+		0x00: byte(2), // L
+		0x01: byte(1), // H
 	})
 
-	servo := NewServo(n, 1)
-	val, err := servo.ModelNumber()
+	val, err := s.ModelNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, 258, val)
 }
 
 func TestFirmwareVersion(t *testing.T) {
-	n := network(map[int]byte{
+	_, s := servo(map[int]byte{
 		0x02: byte(99),
 	})
 
-	servo := NewServo(n, 1)
-	val, err := servo.FirmwareVersion()
+	val, err := s.FirmwareVersion()
 	assert.NoError(t, err)
 	assert.Equal(t, 99, val)
 }
 
 func TestTorqueEnable(t *testing.T) {
-	n := network(map[int]byte{
+	_, s := servo(map[int]byte{
 		0x18: 0,
 	})
 
-	s := NewServo(n, 1)
 	val, err := s.TorqueEnable()
 	assert.NoError(t, err)
 	assert.Equal(t, false, val)
@@ -122,8 +120,7 @@ func TestTorqueEnable(t *testing.T) {
 }
 
 func TestSetTorqueEnable(t *testing.T) {
-	n := &mockNetwork{}
-	s := NewServo(n, 1)
+	n, s := servo(map[int]byte{})
 
 	err := s.SetTorqueEnable(true)
 	assert.NoError(t, err)
@@ -167,13 +164,12 @@ func TestSetLED(t *testing.T) {
 }
 
 func TestMovingSpeed(t *testing.T) {
-	n := network(map[int]byte{
+	_, s := servo(map[int]byte{
 		0x20: 0xff, // L
 		0x21: 0x03, // H
 	})
 
-	servo := NewServo(n, 1)
-	val, err := servo.MovingSpeed()
+	val, err := s.MovingSpeed()
 	assert.NoError(t, err)
 	assert.Equal(t, 1023, val)
 }
@@ -191,85 +187,78 @@ func TestSetMovingSpeed(t *testing.T) {
 }
 
 func TestPosition(t *testing.T) {
-	n := network(map[int]byte{
+	_, s := servo(map[int]byte{
 		0x24: byte(1), // L
 		0x25: 0x00,    // H
 	})
 
-	servo := NewServo(n, 1)
-	val, err := servo.Position()
+	val, err := s.Position()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, val)
 }
 
 func TestPresentSpeed(t *testing.T) {
-	n := network(map[int]byte{
+	_, s := servo(map[int]byte{
 		0x26: byte(0x01), // L
 		0x27: byte(0x04), // H
 	})
 
-	servo := NewServo(n, 1)
-	val, err := servo.PresentSpeed()
+	val, err := s.PresentSpeed()
 	assert.NoError(t, err)
 	assert.Equal(t, 1025, val)
 }
 
 // presentLoad
 func TestPresentLoad(t *testing.T) {
-	n := network(map[int]byte{
+	_, s := servo(map[int]byte{
 		0x28: 5, // L
 		0x29: 4, // H
 	})
 
-	servo := NewServo(n, 1)
-	val, err := servo.PresentLoad()
+	val, err := s.PresentLoad()
 	assert.NoError(t, err)
 	assert.Equal(t, 1029, val)
 }
 
 func TestPresentVoltage(t *testing.T) {
-	n := network(map[int]byte{
+	_, s := servo(map[int]byte{
 		0x2a: 95,
 	})
 
-	servo := NewServo(n, 1)
-	val, err := servo.PresentVoltage()
+	val, err := s.PresentVoltage()
 	assert.NoError(t, err)
 	assert.Equal(t, 95, val)
 }
 
 // presentTemperature
 func TestPresentTemperature(t *testing.T) {
-	n := network(map[int]byte{
+	_, s := servo(map[int]byte{
 		0x2b: 0x55,
 	})
 
-	servo := NewServo(n, 1)
-	val, err := servo.PresentTemperature()
+	val, err := s.PresentTemperature()
 	assert.NoError(t, err)
 	assert.Equal(t, 85, val)
 }
 
 // registered
 func TestRegistered(t *testing.T) {
-	n := network(map[int]byte{
+	_, s := servo(map[int]byte{
 		0x2c: 1,
 	})
 
-	servo := NewServo(n, 1)
-	val, err := servo.Registered()
+	val, err := s.Registered()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, val)
 }
 
 // moving
 func TestMoving(t *testing.T) {
-	n := network(map[int]byte{
+	_, s := servo(map[int]byte{
 		0x2e: 0,
 	})
 
-	servo := NewServo(n, 1)
-	val, err := servo.Moving()
+	val, err := s.Moving()
 	assert.NoError(t, err)
 	assert.Equal(t, 0, val)
 }
@@ -277,12 +266,11 @@ func TestMoving(t *testing.T) {
 // -- High-level interface
 
 func TestVoltage(t *testing.T) {
-	n := network(map[int]byte{
+	_, s := servo(map[int]byte{
 		0x2A: 105,
 	})
 
-	servo := NewServo(n, 1)
-	val, err := servo.Voltage()
+	val, err := s.Voltage()
 	assert.NoError(t, err)
 	assert.Equal(t, 10.5, val)
 }
@@ -295,12 +283,17 @@ type mockNetwork struct {
 	controlTable [50]byte
 }
 
-func network(bytes map[int]byte) *mockNetwork {
+// servo returns a real Servo backed by a mock network, where the control table
+// initially contains the given bytes.
+func servo(b map[int]byte) (*mockNetwork, *DynamixelServo) {
 	n := &mockNetwork{}
-	for addr, val := range bytes {
+
+	for addr, val := range b {
 		n.controlTable[addr] = val
 	}
-	return n
+
+	s := NewServo(n, 1)
+	return n, s
 }
 
 func (n *mockNetwork) Ping(ident uint8) error {
