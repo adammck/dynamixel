@@ -42,7 +42,7 @@ func TestGetRegister(t *testing.T) {
 	assert.Equal(t, 0x99, a)
 
 	// two bytes (cached)
-	b, err := servo.getRegister(Register{0x01, 2, ro, true})
+	b, err := servo.getRegister(Register{byte(1), 2, ro, true})
 	assert.Nil(t, err)
 	assert.Equal(t, 0x2010, b) // 0x10(L) | 0x20(H)<<8
 
@@ -52,7 +52,7 @@ func TestGetRegister(t *testing.T) {
 	c, err := servo.getRegister(Register{0x02, 1, ro, false})
 	assert.Nil(t, err)
 	assert.Equal(t, 0x88, c)
-	assert.Equal(t, 0x88, servo.cache[0x02], "servo cache should have been updated")
+	assert.Equal(t, byte(0x88), servo.cache[0x02], "servo cache should have been updated")
 }
 
 func TestSetRegister(t *testing.T) {
@@ -61,29 +61,29 @@ func TestSetRegister(t *testing.T) {
 
 	// read only register can't be set
 	err := servo.setRegister(Register{0x00, 1, ro, true}, 1)
-	assert.Equal(t, 0x00, n.controlTable[0])
-	assert.Equal(t, 0x00, servo.cache[0])
+	assert.Equal(t, byte(0), n.controlTable[0])
+	assert.Equal(t, byte(0), servo.cache[0])
 	assert.Error(t, err)
 
 	// read/write single byte
-	err = servo.setRegister(Register{0x01, 1, rw, true}, 99)
+	err = servo.setRegister(Register{byte(1), 1, rw, true}, 99)
 	assert.NoError(t, err)
-	assert.Equal(t, 99, n.controlTable[1], "control table should have been written")
-	assert.Equal(t, 99, servo.cache[1], "servo cache should have been updated")
+	assert.Equal(t, byte(99), n.controlTable[1], "control table should have been written")
+	assert.Equal(t, byte(99), servo.cache[1], "servo cache should have been updated")
 
 	// read/write two bytes
 	err = servo.setRegister(Register{0x02, 2, rw, true}, 4097)
 	assert.NoError(t, err)
-	assert.Equal(t, 0x01, n.controlTable[2], "low byte of control table should have been written")
-	assert.Equal(t, 0x10, n.controlTable[3], "high byte of control table should have been written")
-	assert.Equal(t, 0x01, servo.cache[2], "low byte of servo cache should have been updated")
-	assert.Equal(t, 0x10, servo.cache[3], "high byte of servo cache should have been updated")
+	assert.Equal(t, byte(0x01), n.controlTable[2], "low byte of control table should have been written")
+	assert.Equal(t, byte(0x10), n.controlTable[3], "high byte of control table should have been written")
+	assert.Equal(t, byte(0x01), servo.cache[2], "low byte of servo cache should have been updated")
+	assert.Equal(t, byte(0x10), servo.cache[3], "high byte of servo cache should have been updated")
 }
 
 func TestModelNumber(t *testing.T) {
 	n := network(map[int]byte{
-		0x00: 0x02, // L
-		0x01: 0x01, // H
+		0: byte(2), // L
+		1: byte(1), // H
 	})
 
 	servo := NewServo(n, 1)
@@ -114,13 +114,13 @@ func TestSetTorqueEnable(t *testing.T) {
 
 	err := s.SetTorqueEnable(true)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, n.controlTable[0x18])
-	assert.Equal(t, 1, s.cache[0x18])
+	assert.Equal(t, byte(1), n.controlTable[0x18])
+	assert.Equal(t, byte(1), s.cache[0x18])
 
 	err = s.SetTorqueEnable(false)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, n.controlTable[0x18])
-	assert.Equal(t, 0, s.cache[0x18])
+	assert.Equal(t, byte(0), n.controlTable[0x18])
+	assert.Equal(t, byte(0), s.cache[0x18])
 }
 
 func TestLED(t *testing.T) {
@@ -144,19 +144,19 @@ func TestSetLED(t *testing.T) {
 
 	err := s.SetLED(true)
 	assert.NoError(t, err)
-	assert.Equal(t, 1, n.controlTable[0x19])
-	assert.Equal(t, 1, s.cache[0x19])
+	assert.Equal(t, byte(1), n.controlTable[0x19])
+	assert.Equal(t, byte(1), s.cache[0x19])
 
 	err = s.SetLED(false)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, n.controlTable[0x19])
-	assert.Equal(t, 0, s.cache[0x19])
+	assert.Equal(t, byte(0), n.controlTable[0x19])
+	assert.Equal(t, byte(0), s.cache[0x19])
 }
 
 func TestPosition(t *testing.T) {
 	n := network(map[int]byte{
-		0x24: 0x01, // L
-		0x25: 0x00, // H
+		0x24: byte(1), // L
+		0x25: 0x00,    // H
 	})
 
 	servo := NewServo(n, 1)
@@ -183,10 +183,10 @@ func TestSetMovingSpeed(t *testing.T) {
 
 	err := s.SetMovingSpeed(513)
 	assert.NoError(t, err)
-	assert.Equal(t, 0x01, n.controlTable[0x20]) // L
-	assert.Equal(t, 0x02, n.controlTable[0x21]) // H
-	assert.Equal(t, 0x01, s.cache[0x20]) // L
-	assert.Equal(t, 0x02, s.cache[0x21]) // H
+	assert.Equal(t, byte(1), n.controlTable[0x20]) // L
+	assert.Equal(t, byte(2), n.controlTable[0x21]) // H
+	assert.Equal(t, byte(1), s.cache[0x20])        // L
+	assert.Equal(t, byte(2), s.cache[0x21])        // H
 }
 
 func TestVoltage(t *testing.T) {
