@@ -1,8 +1,9 @@
 package dynamixel
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCacheIsPopulated(t *testing.T) {
@@ -104,6 +105,42 @@ func TestFirmwareVersion(t *testing.T) {
 	assert.Equal(t, 99, val)
 }
 
+// ServoID
+// SetServoID
+
+// BaudRate
+// SetBaudRate
+
+// ReturnDelayTime
+// SetReturnDelayTime
+
+// CWAngleLimit
+// SetCWAngleLimit
+
+// CCWAngleLimit
+// SetCCWAngleLimit
+
+// HighestLimitTemperature
+// SetHighestLimitTemperature
+
+// LowestLimitVoltage
+// SetLowestLimitVoltage
+
+// HighestLimitVoltage
+// SetHighestLimitVoltage
+
+// MaxTorque
+// SetMaxTorque
+
+// StatusReturnLevel
+// SetStatusReturnLevel
+
+// AlarmLed
+// SetAlarmLed
+
+// AlarmShutdown
+// SetAlarmShutdown
+
 func TestTorqueEnable(t *testing.T) {
 	_, s := servo(map[int]byte{
 		0x18: 0,
@@ -163,6 +200,21 @@ func TestSetLED(t *testing.T) {
 	assert.Equal(t, byte(0), s.cache[0x19])
 }
 
+// CwComplianceMargin
+// SetCwComplianceMargin
+
+// CcwComplianceMargin
+// SetCcwComplianceMargin
+
+// CwComplianceSlope
+// SetCwComplianceSlope
+
+// CcwComplianceSlope
+// SetCcwComplianceSlope
+
+// GoalPosition
+// SetGoalPosition
+
 func TestMovingSpeed(t *testing.T) {
 	_, s := servo(map[int]byte{
 		0x20: 0xff, // L
@@ -186,13 +238,16 @@ func TestSetMovingSpeed(t *testing.T) {
 	assert.Equal(t, byte(2), s.cache[0x21])        // H
 }
 
-func TestPosition(t *testing.T) {
+// TorqueLimit
+// SetTorqueLimit
+
+func TestPresentPosition(t *testing.T) {
 	_, s := servo(map[int]byte{
 		0x24: byte(1), // L
 		0x25: 0x00,    // H
 	})
 
-	val, err := s.Position()
+	val, err := s.PresentPosition()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, val)
 }
@@ -208,7 +263,6 @@ func TestPresentSpeed(t *testing.T) {
 	assert.Equal(t, 1025, val)
 }
 
-// presentLoad
 func TestPresentLoad(t *testing.T) {
 	_, s := servo(map[int]byte{
 		0x28: 5, // L
@@ -230,7 +284,6 @@ func TestPresentVoltage(t *testing.T) {
 	assert.Equal(t, 95, val)
 }
 
-// presentTemperature
 func TestPresentTemperature(t *testing.T) {
 	_, s := servo(map[int]byte{
 		0x2b: 0x55,
@@ -241,7 +294,6 @@ func TestPresentTemperature(t *testing.T) {
 	assert.Equal(t, 85, val)
 }
 
-// registered
 func TestRegistered(t *testing.T) {
 	_, s := servo(map[int]byte{
 		0x2c: 1,
@@ -252,7 +304,6 @@ func TestRegistered(t *testing.T) {
 	assert.Equal(t, 1, val)
 }
 
-// moving
 func TestMoving(t *testing.T) {
 	_, s := servo(map[int]byte{
 		0x2e: 0,
@@ -262,6 +313,48 @@ func TestMoving(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, val)
 }
+
+func TestLock(t *testing.T) {
+
+	// not locked
+	_, s1 := servo(map[int]byte{
+		0x2f: 0,
+	})
+
+	val, err := s1.Lock()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, val)
+
+	// locked
+	_, s2 := servo(map[int]byte{
+		0x2f: 1,
+	})
+
+	val, err = s2.Lock()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, val)
+}
+
+func TestSetLock(t *testing.T) {
+	_, s := servo(map[int]byte{
+		0x2f: 0,
+	})
+
+	// okay to re-unlock
+	err := s.SetLock(0)
+	assert.NoError(t, err)
+
+	// lock
+	err = s.SetLock(1)
+	assert.NoError(t, err)
+
+	// can't unlock when already locked
+	err = s.SetLock(0)
+	assert.Error(t, err)
+}
+
+// Punch
+// SetPunch
 
 // -- High-level interface
 

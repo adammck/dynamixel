@@ -296,22 +296,44 @@ func (servo *DynamixelServo) PresentVoltage() (int, error) {
 
 func (servo *DynamixelServo) PresentLoad() (int, error) {
 	return servo.getRegister(*registers[presentLoad])
-
 }
 
 func (servo *DynamixelServo) PresentTemperature() (int, error) {
 	return servo.getRegister(*registers[presentTemperature])
-
 }
 
 func (servo *DynamixelServo) Registered() (int, error) {
 	return servo.getRegister(*registers[registered])
-
 }
 
 func (servo *DynamixelServo) Moving() (int, error) {
 	return servo.getRegister(*registers[moving])
+}
 
+// TODO: Rename this to avoid confusion?
+func (servo *DynamixelServo) Lock() (int, error) {
+	return servo.getRegister(*registers[lock])
+}
+
+func (servo *DynamixelServo) SetLock(isLocked int) error {
+	if isLocked > 1 || isLocked < 0 {
+		return errors.New("invalid lock value (must be zero or one)")
+	}
+
+	// Can't unlock when servo is locked, so if we know that's the case, don't
+	// bother trying. Can be overriden by clearing the cache.
+	//
+	// TODO: Add a method to read ints from the cache. If we used getRegister,
+	//       we risk accidentally (in the case of a bug) reading from the actual
+	//       device, which would be slow and weird.
+
+	reg := *registers[lock]
+
+	if isLocked == 0 && servo.cache[reg.address] == byte(1) {
+		return errors.New("EEPROM can't be unlocked; must be power-cycled")
+	}
+
+	return servo.setRegister(reg, isLocked)
 }
 
 //
