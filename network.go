@@ -42,25 +42,21 @@ func NewNetwork(serial io.ReadWriteCloser) *DynamixelNetwork {
 	}
 }
 
-//
-// Puts the network in bufferred write mode, which means that the REG_WRITE
-// instruction will be used, rather than WRITE_DATA. This causes calls to
-// WriteData to be bufferred until the Action method is called, at which time
+// SetBuffered puts the network in bufferred write mode, which means that the
+// REG_WRITE instruction will be used, rather than WRITE_DATA. This causes calls
+// to WriteData to be bufferred until the Action method is called, at which time
 // they'll all be executed at once.
 //
 // This is very useful for synchronizing the movements of multiple servos.
-//
 func (n *DynamixelNetwork) SetBuffered(buffered bool) {
 	n.Buffered = buffered
 }
 
-//
-// Converts an error byte (as included in a status packet) into an error object
-// with a friendly error message. We can't be too specific about it, because any
-// combination of errors might occur at the same time.
+// DecodeStartusError Converts an error byte (as included in a status packet)
+// into an error object with a friendly error message. We can't be too specific
+// about it, because any combination of errors might occur at the same time.
 //
 // See: http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm#Status_Packet
-//
 func DecodeStatusError(errBits byte) error {
 	str := []string{}
 
@@ -99,12 +95,11 @@ func DecodeStatusError(errBits byte) error {
 	return fmt.Errorf("status error(s): %s", strings.Join(str, ", "))
 }
 
-//
 // This stuff is generic to all Dynamixels. See:
 //
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_instruction.htm
-//
+
 func (network *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte, params ...byte) error {
 	buf := new(bytes.Buffer)
 	paramsLength := byte(len(params) + 2)
@@ -143,11 +138,10 @@ func (network *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte,
 	return nil
 }
 
-//
-// Reads `n` bytes, blocking if they're not immediately available. Returns a
-// slice containing the bytes read. If the network timeout is reached, returns
-// the bytes read so far (which might be none) and an error.
-//
+// read receives the next n bytes from the network, blocking if they're not
+// immediately available. Returns a slice containing the bytes read. If the
+// network timeout is reached, returns the bytes read so far (which might be
+// none) and an error.
 func (network *DynamixelNetwork) read(n int) ([]byte, error) {
 	start := time.Now()
 	buf := make([]byte, n)
@@ -356,13 +350,9 @@ func (n *DynamixelNetwork) WriteData(ident uint8, expectStausPacket bool, params
 	return nil
 }
 
-//
-// Broadcasts the ACTION instruction, which initiates any previously bufferred
-// instructions.
-//
-// Doesn't wait for a status packet in response, because they are not sent in
-// response to broadcast instructions.
-//
+// Action broadcasts the ACTION instruction, which initiates any previously
+// bufferred instructions. Doesn't wait for a status packet in response, because
+// they are not sent in response to broadcast instructions.
 func (n *DynamixelNetwork) Action() error {
 	return n.WriteInstruction(BroadcastIdent, Action)
 }
