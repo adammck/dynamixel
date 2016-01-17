@@ -238,6 +238,14 @@ func (servo *DynamixelServo) ModelNumber() (int, error) {
 	return servo.getRegister(*registers[modelNumber])
 }
 
+func (servo *DynamixelServo) FirmwareVersion() (int, error) {
+	return servo.getRegister(*registers[firmwareVersion])
+}
+
+func (servo *DynamixelServo) PresentSpeed() (int, error) {
+	return servo.getRegister(*registers[presentSpeed])
+}
+
 func (servo *DynamixelServo) TorqueEnable() (bool, error) {
 	v, err := servo.getRegister(*registers[torqueEnable])
 	return itob(v), err
@@ -275,21 +283,32 @@ func (servo *DynamixelServo) SetMovingSpeed(speed int) error {
 	return servo.setRegister(*registers[movingSpeed], speed)
 }
 
-// Returns the current position.
-func (servo *DynamixelServo) Position() (int, error) {
+func (servo *DynamixelServo) PresentPosition() (int, error) {
 	return servo.getRegister(*registers[presentPosition])
 }
 
-// Voltage returns the current voltage supplied. Unlike the underlying register,
-// this is the actual voltage, not multiplied by ten.
-func (servo *DynamixelServo) Voltage() (float64, error) {
-	val, err := servo.getRegister(*registers[presentVoltage])
-	if err != nil {
-		return 0.0, err
-	}
+func (servo *DynamixelServo) PresentVoltage() (int, error) {
+	return servo.getRegister(*registers[presentVoltage])
+}
 
-	// Convert the return value into actual volts.
-	return (float64(val) / 10), nil
+func (servo *DynamixelServo) PresentLoad() (int, error) {
+	return servo.getRegister(*registers[presentLoad])
+
+}
+
+func (servo *DynamixelServo) PresentTemperature() (int, error) {
+	return servo.getRegister(*registers[presentTemperature])
+
+}
+
+func (servo *DynamixelServo) Registered() (int, error) {
+	return servo.getRegister(*registers[registered])
+
+}
+
+func (servo *DynamixelServo) Moving() (int, error) {
+	return servo.getRegister(*registers[moving])
+
 }
 
 //
@@ -411,6 +430,23 @@ func (servo *DynamixelServo) SetIdent(ident int) error {
 
 	servo.Ident = i
 	return nil
+}
+
+// Voltage returns the current voltage supplied. Unlike the underlying register,
+// this is the actual voltage, not multiplied by ten.
+func (servo *DynamixelServo) Voltage() (float64, error) {
+	val, err := servo.PresentVoltage()
+	if err != nil {
+		return 0.0, err
+	}
+
+	// Convert the return value into actual volts.
+	return (float64(val) / 10), nil
+}
+
+// Position is an alias for PresentPosition.
+func (servo *DynamixelServo) Position() (int, error) {
+	return servo.PresentPosition()
 }
 
 func (servo *DynamixelServo) logMethod(format string, v ...interface{}) {

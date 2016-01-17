@@ -80,6 +80,8 @@ func TestSetRegister(t *testing.T) {
 	assert.Equal(t, byte(0x10), servo.cache[3], "high byte of servo cache should have been updated")
 }
 
+// -- Registers
+
 func TestModelNumber(t *testing.T) {
 	n := network(map[int]byte{
 		0: byte(2), // L
@@ -90,6 +92,17 @@ func TestModelNumber(t *testing.T) {
 	val, err := servo.ModelNumber()
 	assert.NoError(t, err)
 	assert.Equal(t, 258, val)
+}
+
+func TestFirmwareVersion(t *testing.T) {
+	n := network(map[int]byte{
+		0x02: byte(99),
+	})
+
+	servo := NewServo(n, 1)
+	val, err := servo.FirmwareVersion()
+	assert.NoError(t, err)
+	assert.Equal(t, 99, val)
 }
 
 func TestTorqueEnable(t *testing.T) {
@@ -153,18 +166,6 @@ func TestSetLED(t *testing.T) {
 	assert.Equal(t, byte(0), s.cache[0x19])
 }
 
-func TestPosition(t *testing.T) {
-	n := network(map[int]byte{
-		0x24: byte(1), // L
-		0x25: 0x00,    // H
-	})
-
-	servo := NewServo(n, 1)
-	val, err := servo.Position()
-	assert.NoError(t, err)
-	assert.Equal(t, 1, val)
-}
-
 func TestMovingSpeed(t *testing.T) {
 	n := network(map[int]byte{
 		0x20: 0xff, // L
@@ -189,15 +190,101 @@ func TestSetMovingSpeed(t *testing.T) {
 	assert.Equal(t, byte(2), s.cache[0x21])        // H
 }
 
+func TestPosition(t *testing.T) {
+	n := network(map[int]byte{
+		0x24: byte(1), // L
+		0x25: 0x00,    // H
+	})
+
+	servo := NewServo(n, 1)
+	val, err := servo.Position()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, val)
+}
+
+func TestPresentSpeed(t *testing.T) {
+	n := network(map[int]byte{
+		0x26: byte(0x01), // L
+		0x27: byte(0x04), // H
+	})
+
+	servo := NewServo(n, 1)
+	val, err := servo.PresentSpeed()
+	assert.NoError(t, err)
+	assert.Equal(t, 1025, val)
+}
+
+// presentLoad
+func TestPresentLoad(t *testing.T) {
+	n := network(map[int]byte{
+		0x28: 5, // L
+		0x29: 4, // H
+	})
+
+	servo := NewServo(n, 1)
+	val, err := servo.PresentLoad()
+	assert.NoError(t, err)
+	assert.Equal(t, 1029, val)
+}
+
+func TestPresentVoltage(t *testing.T) {
+	n := network(map[int]byte{
+		0x2a: 95,
+	})
+
+	servo := NewServo(n, 1)
+	val, err := servo.PresentVoltage()
+	assert.NoError(t, err)
+	assert.Equal(t, 95, val)
+}
+
+// presentTemperature
+func TestPresentTemperature(t *testing.T) {
+	n := network(map[int]byte{
+		0x2b: 0x55,
+	})
+
+	servo := NewServo(n, 1)
+	val, err := servo.PresentTemperature()
+	assert.NoError(t, err)
+	assert.Equal(t, 85, val)
+}
+
+// registered
+func TestRegistered(t *testing.T) {
+	n := network(map[int]byte{
+		0x2c: 1,
+	})
+
+	servo := NewServo(n, 1)
+	val, err := servo.Registered()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, val)
+}
+
+// moving
+func TestMoving(t *testing.T) {
+	n := network(map[int]byte{
+		0x2e: 0,
+	})
+
+	servo := NewServo(n, 1)
+	val, err := servo.Moving()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, val)
+}
+
+// -- High-level interface
+
 func TestVoltage(t *testing.T) {
 	n := network(map[int]byte{
-		0x2A: 95,
+		0x2A: 105,
 	})
 
 	servo := NewServo(n, 1)
 	val, err := servo.Voltage()
 	assert.NoError(t, err)
-	assert.Equal(t, 9.5, val)
+	assert.Equal(t, 10.5, val)
 }
 
 // -----------------------------------------------------------------------------
