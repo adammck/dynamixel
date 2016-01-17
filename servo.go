@@ -22,6 +22,7 @@ const (
 	addrTorqueLimit  byte = 0x22 // 2
 
 	// Limits (from dxl_ax_actuator.htm)
+	// TODO: Move these to the registValers
 	maxPos   uint16  = 1023
 	maxSpeed uint16  = 1023
 	maxAngle float64 = 300
@@ -127,6 +128,14 @@ func (servo *DynamixelServo) getRegister(reg Register) (int, error) {
 func (servo *DynamixelServo) setRegister(reg Register, value int) error {
 	if reg.access == ro {
 		return fmt.Errorf("can't write to a read-only register")
+	}
+
+	if value < reg.min {
+		return fmt.Errorf("value too low: %d (min=%d)", value, reg.min)
+	}
+
+	if value > reg.max {
+		return fmt.Errorf("value too high: %d (max=%d)", value, reg.max)
 	}
 
 	// TODO: Add log message when setting a register.
@@ -261,6 +270,7 @@ func (servo *DynamixelServo) SetTorqueEnable(state bool) error {
 }
 
 // LED returns the current state of the servo's LED.
+// TODO: Should we continue to return bool here, or expose the int?
 func (servo *DynamixelServo) LED() (bool, error) {
 	v, err := servo.getRegister(*registers[led])
 	return itob(v), err
@@ -269,6 +279,25 @@ func (servo *DynamixelServo) LED() (bool, error) {
 // Enables or disables the servo's LED.
 func (servo *DynamixelServo) SetLED(state bool) error {
 	return servo.setRegister(*registers[led], btoi(state))
+}
+
+func (servo *DynamixelServo) GoalPosition() (int, error) {
+	return servo.getRegister(*registers[goalPosition])
+}
+
+// SetGoalPosition sets the goal position.
+func (servo *DynamixelServo) SetGoalPosition(pos int) error {
+
+	// TODO: Reject if the servo is in wheel mode (where CW and CCW angle limit
+	//       is zero).
+
+	reg := *registers[goalPosition]
+
+	if pos < reg.min || pos > reg.max {
+		return errors.New("goal position out of range")
+	}
+
+	return servo.setRegister(reg, pos)
 }
 
 // MovingSpeed returns the current moving speed. This is not the speed at which
@@ -387,15 +416,6 @@ func (servo *DynamixelServo) MoveTo(angle float64) error {
 //    These methods should follow the Dynamixel protocol docs as closely as
 //    possible, with no fancy stuff.
 //
-
-// Sets the goal position.
-// See: http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm#Actuator_Address_1E
-func (servo *DynamixelServo) SetGoalPosition(pos int) error {
-	if pos < 0 || pos > int(maxPos) {
-		return errors.New("goal position out of range")
-	}
-	return servo.writeData(addrGoalPosition, low(pos), high(pos))
-}
 
 // Sets the torque limit.
 func (servo *DynamixelServo) SetTorqueLimit(limit int) error {

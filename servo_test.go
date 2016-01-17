@@ -35,24 +35,24 @@ func TestGetRegister(t *testing.T) {
 	servo.cache[0x03] = byte(0x88)
 
 	// invalid register length
-	x, err := servo.getRegister(Register{0x00, 3, ro, true})
+	x, err := servo.getRegister(Register{0x00, 3, ro, true, 0, 1})
 	assert.Error(t, err)
 	assert.Equal(t, 0, x)
 
 	// one byte (cached)
-	a, err := servo.getRegister(Register{0x00, 1, ro, true})
+	a, err := servo.getRegister(Register{0x00, 1, ro, true, 0, 1})
 	assert.Nil(t, err)
 	assert.Equal(t, 0x99, a)
 
 	// two bytes (cached)
-	b, err := servo.getRegister(Register{byte(1), 2, ro, true})
+	b, err := servo.getRegister(Register{byte(1), 2, ro, true, 0, 1})
 	assert.Nil(t, err)
 	assert.Equal(t, 0x2010, b) // 0x10(L) | 0x20(H)<<8
 
 	// one byte (immediate)
 	servo.cache[0x02] = 0x77
 	n.controlTable[0x02] = 0x88
-	c, err := servo.getRegister(Register{0x02, 1, ro, false})
+	c, err := servo.getRegister(Register{0x02, 1, ro, false, 0, 1})
 	assert.Nil(t, err)
 	assert.Equal(t, 0x88, c)
 	assert.Equal(t, byte(0x88), servo.cache[0x02], "servo cache should have been updated")
@@ -62,24 +62,36 @@ func TestSetRegister(t *testing.T) {
 	n, servo := servo(map[int]byte{})
 
 	// read only register can't be set
-	err := servo.setRegister(Register{0x00, 1, ro, true}, 1)
+	err := servo.setRegister(Register{0x00, 1, ro, true, 0, 1}, 1)
 	assert.Equal(t, byte(0), n.controlTable[0])
 	assert.Equal(t, byte(0), servo.cache[0])
 	assert.Error(t, err)
 
 	// read/write single byte
-	err = servo.setRegister(Register{byte(1), 1, rw, true}, 99)
+	err = servo.setRegister(Register{0x01, 1, rw, true, 0, 2}, 2)
 	assert.NoError(t, err)
-	assert.Equal(t, byte(99), n.controlTable[1], "control table should have been written")
-	assert.Equal(t, byte(99), servo.cache[1], "servo cache should have been updated")
+	assert.Equal(t, byte(2), n.controlTable[1], "control table should have been written")
+	assert.Equal(t, byte(2), servo.cache[1], "servo cache should have been updated")
 
 	// read/write two bytes
-	err = servo.setRegister(Register{0x02, 2, rw, true}, 4097)
+	err = servo.setRegister(Register{0x02, 2, rw, true, 0, 2048}, 1025)
 	assert.NoError(t, err)
 	assert.Equal(t, byte(0x01), n.controlTable[2], "low byte of control table should have been written")
-	assert.Equal(t, byte(0x10), n.controlTable[3], "high byte of control table should have been written")
+	assert.Equal(t, byte(0x04), n.controlTable[3], "high byte of control table should have been written")
 	assert.Equal(t, byte(0x01), servo.cache[2], "low byte of servo cache should have been updated")
-	assert.Equal(t, byte(0x10), servo.cache[3], "high byte of servo cache should have been updated")
+	assert.Equal(t, byte(0x04), servo.cache[3], "high byte of servo cache should have been updated")
+
+	// write too-low value with one byte
+	err = servo.setRegister(Register{0x04, 1, rw, true, 2, 3}, 1)
+	assert.EqualError(t, err, "value too low: 1 (min=2)")
+	assert.Equal(t, byte(0x00), n.controlTable[4], "control table should NOT have been written")
+	assert.Equal(t, byte(0x00), servo.cache[4], "servo cache should NOT have been updated")
+
+	// write too-high value with one byte
+	err = servo.setRegister(Register{0x05, 1, rw, true, 2, 3}, 4)
+	assert.EqualError(t, err, "value too high: 4 (max=3)")
+	assert.Equal(t, byte(0x00), n.controlTable[5], "control table should NOT have been written")
+	assert.Equal(t, byte(0x00), servo.cache[5], "servo cache should NOT have been updated")
 }
 
 // -- Registers
@@ -212,8 +224,36 @@ func TestSetLED(t *testing.T) {
 // CcwComplianceSlope
 // SetCcwComplianceSlope
 
-// GoalPosition
-// SetGoalPosition
+func TestGoalPosition(t *testing.T) {
+	_, s := servo(map[int]byte{
+		0x1e: 0xff, // L
+		0x1f: 0x03, // H
+	})
+
+	val, err := s.GoalPosition()
+	assert.NoError(t, err)
+	assert.Equal(t, 1023, val)
+}
+
+func TestSetGoalPosition(t *testing.T) {
+	n, s := servo(map[int]byte{})
+
+	// valid
+	err := s.SetGoalPosition(513)
+	assert.NoError(t, err)
+	assert.Equal(t, byte(1), n.controlTable[0x1e]) // L
+	assert.Equal(t, byte(2), n.controlTable[0x1f]) // H
+	assert.Equal(t, byte(1), s.cache[0x1e])        // L
+	assert.Equal(t, byte(2), s.cache[0x1f])        // H
+
+	// too low
+	err = s.SetGoalPosition(-1)
+	assert.Error(t, err)
+
+	// too high
+	err = s.SetGoalPosition(1025)
+	assert.Error(t, err)
+}
 
 func TestMovingSpeed(t *testing.T) {
 	_, s := servo(map[int]byte{
