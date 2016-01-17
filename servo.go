@@ -17,17 +17,9 @@ const (
 	addrID                byte = 0x03 // 1
 	addrStatusReturnLevel byte = 0x10 // 1
 
-	// Control Table Addresses (RAM, Read/Write)
-	addrGoalPosition byte = 0x1E // 2
-	addrTorqueLimit  byte = 0x22 // 2
-
-	// Limits (from dxl_ax_actuator.htm)
-	// TODO: Move these to the registValers
-	maxPos   uint16  = 1023
-	maxSpeed uint16  = 1023
-	maxAngle float64 = 300
-
 	// Unit conversions
+	maxPos          uint16  = 1023
+	maxAngle        float64 = 300
 	positionToAngle float64 = maxAngle / float64(maxPos) // 0.293255132
 	angleToPosition float64 = 1 / positionToAngle        // 3.41
 )
@@ -308,11 +300,15 @@ func (servo *DynamixelServo) MovingSpeed() (int, error) {
 
 // Sets the moving speed.
 func (servo *DynamixelServo) SetMovingSpeed(speed int) error {
-	if speed < 0 || speed > int(maxSpeed) {
-		return errors.New("moving speed out of range")
-	}
-
 	return servo.setRegister(*registers[movingSpeed], speed)
+}
+
+func (servo *DynamixelServo) TorqueLimit() (int, error) {
+	return servo.getRegister(*registers[torqueLimit])
+}
+
+func (servo *DynamixelServo) SetTorqueLimit(val int) error {
+	return servo.setRegister(*registers[torqueLimit], val)
 }
 
 func (servo *DynamixelServo) PresentPosition() (int, error) {
@@ -416,16 +412,6 @@ func (servo *DynamixelServo) MoveTo(angle float64) error {
 //    These methods should follow the Dynamixel protocol docs as closely as
 //    possible, with no fancy stuff.
 //
-
-// Sets the torque limit.
-func (servo *DynamixelServo) SetTorqueLimit(limit int) error {
-	servo.logMethod("SetTorqueLimit(%d)", limit)
-
-	if limit < 0 || limit > 1023 {
-		return errors.New("torque limit out of range")
-	}
-	return servo.writeData(addrTorqueLimit, low(limit), high(limit))
-}
 
 // Sets the status return level. Possible values are:
 //

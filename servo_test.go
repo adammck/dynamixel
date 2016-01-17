@@ -278,8 +278,38 @@ func TestSetMovingSpeed(t *testing.T) {
 	assert.Equal(t, byte(2), s.cache[0x21])        // H
 }
 
-// TorqueLimit
-// SetTorqueLimit
+func TestTorqueLimit(t *testing.T) {
+	n, s := servo(map[int]byte{
+		0x22: 0xff, // L
+		0x23: 0x03, // H
+	})
+
+	// read
+	val, err := s.TorqueLimit()
+	assert.NoError(t, err)
+	assert.Equal(t, 1023, val)
+
+	// min
+	err = s.SetTorqueLimit(-1)
+	assert.Error(t, err)
+
+	// max
+	err = s.SetTorqueLimit(1024)
+	assert.Error(t, err)
+
+	// write
+	err = s.SetTorqueLimit(513)
+	assert.NoError(t, err)
+	assert.Equal(t, byte(1), n.controlTable[0x22]) // L
+	assert.Equal(t, byte(2), n.controlTable[0x23]) // H
+	assert.Equal(t, byte(1), s.cache[0x22])        // L
+	assert.Equal(t, byte(2), s.cache[0x23])        // H
+
+	// re-read
+	val, err = s.TorqueLimit()
+	assert.NoError(t, err)
+	assert.Equal(t, 513, val)
+}
 
 func TestPresentPosition(t *testing.T) {
 	_, s := servo(map[int]byte{

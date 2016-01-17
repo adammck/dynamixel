@@ -62,38 +62,44 @@ type Register struct {
 var registers map[RegName]*Register
 
 func init() {
+	x := 0
+
 	registers = map[RegName]*Register{
-		modelNumber:             {0x00, 2, ro, true, 0, 0},
-		firmwareVersion:         {0x02, 1, ro, true, 0, 0},
-		servoID:                 {0x03, 1, rw, true, 0, 1024}, // renamed from ID for clarity
-		baudRate:                {0x04, 1, rw, true, 0, 1024},
-		returnDelayTime:         {0x05, 1, rw, true, 0, 1024},
-		cwAngleLimit:            {0x06, 2, rw, true, 0, 1024},
-		ccwAngleLimit:           {0x08, 2, rw, true, 0, 1024},
-		highestLimitTemperature: {0x0b, 1, rw, true, 0, 1024},
-		lowestLimitVoltage:      {0x0c, 1, rw, true, 0, 1024},
-		highestLimitVoltage:     {0x0d, 1, rw, true, 0, 1024},
-		maxTorque:               {0x0e, 2, rw, true, 0, 1024},
-		statusReturnLevel:       {0x10, 1, rw, true, 0, 1024},
-		alarmLed:                {0x11, 1, rw, true, 0, 1024},
-		alarmShutdown:           {0x12, 1, rw, true, 0, 1024},
-		torqueEnable:            {0x18, 1, rw, true, 0, 1024},
-		led:                     {0x19, 1, rw, true, 0, 1024},
-		cwComplianceMargin:      {0x1a, 1, rw, true, 0, 1024},
-		ccwComplianceMargin:     {0x1b, 1, rw, true, 0, 1024},
-		cwComplianceSlope:       {0x1c, 1, rw, true, 0, 1024},
-		ccwComplianceSlope:      {0x1d, 1, rw, true, 0, 1024},
-		goalPosition:            {0x1e, 2, rw, true, 0, 1024},
-		movingSpeed:             {0x20, 2, rw, true, 0, 1024},
-		torqueLimit:             {0x22, 2, rw, true, 0, 1024},
-		presentPosition:         {0x24, 2, ro, false, 0, 0},
-		presentSpeed:            {0x26, 2, ro, true, 0, 0},
-		presentLoad:             {0x28, 2, ro, true, 0, 0},
-		presentVoltage:          {0x2a, 1, ro, false, 0, 0},
-		presentTemperature:      {0x2b, 1, ro, true, 0, 0},
-		registered:              {0x2c, 1, ro, true, 0, 0},
-		moving:                  {0x2e, 1, ro, true, 0, 0},
-		lock:                    {0x2f, 1, rw, true, 0, 1024},
-		punch:                   {0x30, 2, rw, true, 0, 1024},
+
+		// EEPROM: Persisted
+		modelNumber:             {0x00, 2, ro, true, x, x},
+		firmwareVersion:         {0x02, 1, ro, true, x, x},
+		servoID:                 {0x03, 1, rw, true, 0, 252}, // renamed from ID for clarity
+		baudRate:                {0x04, 1, rw, true, 0, 254}, // bps = 2000000/(value+1)
+		returnDelayTime:         {0x05, 1, rw, true, 0, 254}, // usec = value*2
+		cwAngleLimit:            {0x06, 2, rw, true, 0, 1023},
+		ccwAngleLimit:           {0x08, 2, rw, true, 0, 1023},
+		highestLimitTemperature: {0x0b, 1, rw, true, 0, 70},   // docs says not to set
+		lowestLimitVoltage:      {0x0c, 1, rw, true, 50, 250}, // volt = value*0.1
+		highestLimitVoltage:     {0x0d, 1, rw, true, 50, 250}, // volt = value*0.1
+		maxTorque:               {0x0e, 2, rw, true, 0, 1023}, // from zero to max torque
+		statusReturnLevel:       {0x10, 1, rw, true, 0, 2},    // enum; see docs
+		alarmLed:                {0x11, 1, rw, true, 0, 256},  // enum; see docs
+		alarmShutdown:           {0x12, 1, rw, true, 0, 256},  // enum; see docs
+
+		// RAM: Reset to default when power-cycled
+		torqueEnable:        {0x18, 1, rw, true, 0, 1},    // bool
+		led:                 {0x19, 1, rw, true, 0, 1},    // bool
+		cwComplianceMargin:  {0x1a, 1, rw, true, 0, 255},  // def=1
+		ccwComplianceMargin: {0x1b, 1, rw, true, 0, 255},  // def=1
+		cwComplianceSlope:   {0x1c, 1, rw, true, 0, 254},  // stepped (see docs), def=32
+		ccwComplianceSlope:  {0x1d, 1, rw, true, 0, 254},  // stepped (see docs), def=32
+		goalPosition:        {0x1e, 2, rw, true, 0, 1023}, // deg = value*0.29; 512 (150 deg) is center
+		movingSpeed:         {0x20, 2, rw, true, 0, 1023}, // joint mode: rpm = ~value*0.111, but 0 = max rpm. wheel mode: see docs
+		torqueLimit:         {0x22, 2, rw, true, 0, 1023}, // zero to max torque
+		presentPosition:     {0x24, 2, ro, false, x, x},   // like goalPosition
+		presentSpeed:        {0x26, 2, ro, true, x, x},
+		presentLoad:         {0x28, 2, ro, true, x, x},
+		presentVoltage:      {0x2a, 1, ro, false, x, x},
+		presentTemperature:  {0x2b, 1, ro, true, x, x},
+		registered:          {0x2c, 1, ro, true, x, x},
+		moving:              {0x2e, 1, ro, true, x, x},
+		lock:                {0x2f, 1, rw, true, 0, 1}, // bool
+		punch:               {0x30, 2, rw, true, 32, 1023},
 	}
 }
