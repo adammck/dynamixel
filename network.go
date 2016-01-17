@@ -24,6 +24,15 @@ const (
 	BroadcastIdent byte = 0xFE // 254
 )
 
+// Networker provides an interface to the underlying servos' control tables by
+// reading and writing to/from the network interface.
+type Networker interface {
+	Ping(uint8) error
+	ReadData(uint8, byte, int) ([]byte, error)
+	WriteData(uint8, bool, ...byte) error
+	Log(string, ...interface{})
+}
+
 type DynamixelNetwork struct {
 	Serial   io.ReadWriteCloser
 	Buffered bool
@@ -284,7 +293,8 @@ func (n *DynamixelNetwork) Ping(ident uint8) error {
 }
 
 // ReadData reads a slice of n bytes from the control table of the given servo
-// ID. The ReadInt method is usually more useful.
+// ID. Use the bytesToInt function to convert the output to something more
+// useful.
 func (network *DynamixelNetwork) ReadData(ident uint8, addr byte, n int) ([]byte, error) {
 	params := []byte{addr, byte(n)}
 	err := network.WriteInstruction(ident, ReadData, params...)
@@ -298,32 +308,6 @@ func (network *DynamixelNetwork) ReadData(ident uint8, addr byte, n int) ([]byte
 	}
 
 	return buf, nil
-}
-
-// ReadInt reads an unsigned integer from the control table of the given servo
-// ID. Only 8- and 16-bit uints are supported, because those are the only thing
-// the control table contains.
-func (network *DynamixelNetwork) ReadInt(ident uint8, addr byte, n int) (int, error) {
-	if n != 1 && n != 2 {
-		return 0, fmt.Errorf("invalid read length %d", n)
-	}
-
-	b, err := network.ReadData(ident, addr, n)
-	if err != nil {
-		return 0, err
-	}
-
-	switch len(b) {
-	case 1:
-		return int(b[0]), nil
-
-	case 2:
-		return int(b[0]) | int(b[1])<<8, nil
-
-	default:
-		return 0, fmt.Errorf("expected %d bytes, got %d", n, len(b))
-
-	}
 }
 
 func (n *DynamixelNetwork) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {

@@ -31,15 +31,6 @@ const (
 	angleToPosition float64 = 1 / positionToAngle        // 3.41
 )
 
-// Networker provides an interface to the underlying servos' control tables.
-type Networker interface {
-	Ping(uint8) error
-	ReadData(uint8, byte, int) ([]byte, error)
-	ReadInt(uint8, byte, int) (int, error)
-	WriteData(uint8, bool, ...byte) error
-	Log(string, ...interface{})
-}
-
 type DynamixelServo struct {
 	Network   Networker
 	Ident     uint8
@@ -163,33 +154,17 @@ func (servo *DynamixelServo) Ping() error {
 	return servo.Network.Ping(servo.Ident)
 }
 
-// Converts a bool to an int.
-func btoi(b bool) int {
-	if b {
-		return 1
-	}
-	return 0
-}
-
-// itob converts an int to a bool.
-func itob(v int) bool {
-	return (v != 0)
-}
-
-func low(i int) byte {
-	return byte(i & 0xFF)
-}
-
-func high(i int) byte {
-	return low(i >> 8)
-}
-
 func (servo *DynamixelServo) readInt(addr byte, n int) (int, error) {
 	if servo.statusReturnLevel == 0 {
 		return 0, errors.New("can't READ while Status Return Level is zero")
 	}
 
-	return servo.Network.ReadInt(servo.Ident, addr, n)
+	b, err := servo.Network.ReadData(servo.Ident, addr, n)
+	if err != nil {
+		return 0, err
+	}
+
+	return bytesToInt(b)
 }
 
 // TODO: Remove this in favor of setRegister?
@@ -214,16 +189,12 @@ func normalizeAngle(d float64) float64 {
 	}
 }
 
-
-
-
 //
 // -- Registers
 //
 //    These methods are getters for the various registers in the control table.
 //    Some of them (where register.cacheable == true) just read from the cache,
 //    while others read the actual control table every time.
-//
 //
 // TODO: Each of the following registers should have a corresponding reader, and
 //       the R/W registers (marked with an asterisk) should have a writer. They
@@ -320,9 +291,6 @@ func (servo *DynamixelServo) Voltage() (float64, error) {
 	// Convert the return value into actual volts.
 	return (float64(val) / 10), nil
 }
-
-
-
 
 //
 // -- High-level interface

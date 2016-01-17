@@ -224,11 +224,6 @@ func (n *mockNetwork) ReadData(ident uint8, addr byte, count int) ([]byte, error
 	return n.controlTable[int(addr) : int(addr)+count], nil
 }
 
-// TODO: Move this into Servo?
-func (n *mockNetwork) ReadInt(ident uint8, addr byte, count int) (int, error) {
-	return 0, nil
-}
-
 func (n *mockNetwork) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {
 	addr := int(params[0])
 
