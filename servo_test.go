@@ -58,6 +58,30 @@ func TestGetRegister(t *testing.T) {
 	assert.Equal(t, byte(0x88), servo.cache[0x02], "servo cache should have been updated")
 }
 
+func TestGetCached(t *testing.T) {
+	n, s := servo(map[int]byte{})
+
+	// attempting to read an uncacheable register fails
+	_, err := s.getCached(Register{0x00, 1, ro, false, 0, 1})
+	assert.EqualError(t, err, "register 0x00 is uncacheable")
+
+	// one byte
+	s.cache[0x01] = 2
+	n.controlTable[0x01] = 3
+	val, err := s.getCached(Register{0x01, 1, ro, true, 0, 1})
+	assert.Nil(t, err)
+	assert.Equal(t, 2, val)
+
+	// two bytes
+	s.cache[0x02] = 4
+	s.cache[0x03] = 4
+	n.controlTable[0x02] = 5
+	n.controlTable[0x03] = 5
+	val, err = s.getCached(Register{0x02, 2, ro, true, 0, 1})
+	assert.Nil(t, err)
+	assert.Equal(t, 1028, val)
+}
+
 func TestSetRegister(t *testing.T) {
 	n, servo := servo(map[int]byte{})
 
