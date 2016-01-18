@@ -117,8 +117,35 @@ func TestFirmwareVersion(t *testing.T) {
 	assert.Equal(t, 99, val)
 }
 
-// ServoID
-// SetServoID
+func TestServoID(t *testing.T) {
+	n, s := servo(map[int]byte{
+		0x03: 0x1,
+	})
+
+	// read
+	val, err := s.ServoID()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, val)
+
+	// min
+	err = s.SetServoID(-1)
+	assert.Error(t, err)
+
+	// max
+	err = s.SetServoID(253)
+	assert.Error(t, err)
+
+	// write
+	err = s.SetServoID(2)
+	assert.NoError(t, err)
+	assert.Equal(t, byte(2), n.controlTable[0x03])
+	assert.Equal(t, byte(2), s.cache[0x03])
+
+	// re-read
+	val, err = s.ServoID()
+	assert.NoError(t, err)
+	assert.Equal(t, 2, val)
+}
 
 // BaudRate
 // SetBaudRate
@@ -212,15 +239,40 @@ func TestSetLED(t *testing.T) {
 	assert.Equal(t, byte(0), s.cache[0x19])
 }
 
-// CwComplianceMargin
-// SetCwComplianceMargin
+func TestCWComplianceMargin(t *testing.T) {
+	n, s := servo(map[int]byte{
+		0x1a: 0x1,
+	})
+
+	// read
+	val, err := s.CWComplianceMargin()
+	assert.NoError(t, err)
+	assert.Equal(t, 1, val)
+
+	// min
+	err = s.SetCWComplianceMargin(-1)
+	assert.Error(t, err)
+
+	// max
+	err = s.SetCWComplianceMargin(1024)
+	assert.Error(t, err)
+
+	// write
+	err = s.SetCWComplianceMargin(2)
+	assert.NoError(t, err)
+	assert.Equal(t, byte(2), n.controlTable[0x1a])
+	assert.Equal(t, byte(2), s.cache[0x1a])
+
+	// re-read
+	val, err = s.CWComplianceMargin()
+	assert.NoError(t, err)
+	assert.Equal(t, 2, val)
+}
 
 // CcwComplianceMargin
 // SetCcwComplianceMargin
-
 // CwComplianceSlope
 // SetCwComplianceSlope
-
 // CcwComplianceSlope
 // SetCcwComplianceSlope
 

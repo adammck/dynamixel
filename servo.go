@@ -246,8 +246,140 @@ func (servo *DynamixelServo) FirmwareVersion() (int, error) {
 	return servo.getRegister(*registers[firmwareVersion])
 }
 
-func (servo *DynamixelServo) PresentSpeed() (int, error) {
-	return servo.getRegister(*registers[presentSpeed])
+func (servo *DynamixelServo) ServoID() (int, error) {
+	return servo.getRegister(*registers[servoID])
+}
+
+// SetServoID changes the identity of the servo.
+// This is stored in EEPROM, so will persist between reboots.
+func (servo *DynamixelServo) SetServoID(ident int) error {
+	servo.logMethod("SetIdent(%d, %d)", ident)
+
+	err := servo.setRegister(*registers[servoID], ident)
+	if err != nil {
+		return err
+	}
+
+	// TODO: Get rid of this and use the cache.
+	servo.Ident = uint8(ident)
+	return nil
+}
+
+func (servo *DynamixelServo) BaudRate() (int, error) {
+	return servo.getRegister(*registers[baudRate])
+}
+
+func (servo *DynamixelServo) SetBaudRate(v int) error {
+	return servo.setRegister(*registers[baudRate], v)
+}
+
+func (servo *DynamixelServo) ReturnDelayTime() (int, error) {
+	return servo.getRegister(*registers[returnDelayTime])
+}
+
+func (servo *DynamixelServo) SetReturnDelayTime(v int) error {
+	return servo.setRegister(*registers[returnDelayTime], v)
+}
+
+func (servo *DynamixelServo) CWAngleLimit() (int, error) {
+	return servo.getRegister(*registers[cwAngleLimit])
+}
+
+func (servo *DynamixelServo) SetCWAngleLimit(v int) error {
+	return servo.setRegister(*registers[cwAngleLimit], v)
+}
+
+func (servo *DynamixelServo) CCWAngleLimit() (int, error) {
+	return servo.getRegister(*registers[ccwAngleLimit])
+}
+
+func (servo *DynamixelServo) SetCCWAngleLimit(v int) error {
+	return servo.setRegister(*registers[ccwAngleLimit], v)
+}
+
+func (servo *DynamixelServo) HighestLimitTemperature() (int, error) {
+	return servo.getRegister(*registers[highestLimitTemperature])
+}
+
+func (servo *DynamixelServo) SetHighestLimitTemperature(v int) error {
+	return servo.setRegister(*registers[highestLimitTemperature], v)
+}
+
+func (servo *DynamixelServo) LowestLimitVoltage() (int, error) {
+	return servo.getRegister(*registers[lowestLimitVoltage])
+}
+
+func (servo *DynamixelServo) SetLowestLimitVoltage(v int) error {
+	return servo.setRegister(*registers[lowestLimitVoltage], v)
+}
+
+func (servo *DynamixelServo) HighestLimitVoltage() (int, error) {
+	return servo.getRegister(*registers[highestLimitVoltage])
+}
+
+func (servo *DynamixelServo) SetHighestLimitVoltage(v int) error {
+	return servo.setRegister(*registers[highestLimitVoltage], v)
+}
+
+func (servo *DynamixelServo) MaxTorque() (int, error) {
+	return servo.getRegister(*registers[maxTorque])
+}
+
+func (servo *DynamixelServo) SetMaxTorque(v int) error {
+	return servo.setRegister(*registers[maxTorque], v)
+}
+
+func (servo *DynamixelServo) StatusReturnLevel() (int, error) {
+	return servo.getRegister(*registers[statusReturnLevel])
+}
+
+// Sets the status return level. Possible values are:
+//
+// 0 = Only respond to PING commands
+// 1 = Only respond to PING and READ commands
+// 2 = Respond to all commands
+//
+// Servos default to 2, but retain the value so long as they're powered up. This
+// makes it a very good idea to explicitly set the value after connecting, to
+// avoid waiting for status packets which will never arrive.
+//
+// See: dxl_ax_actuator.htm#Actuator_Address_10
+func (servo *DynamixelServo) SetStatusReturnLevel(value int) error {
+	servo.logMethod("SetStatusReturnLevel(%d)", value)
+	reg := *registers[statusReturnLevel]
+
+	if value < reg.min || value > reg.max {
+		return fmt.Errorf("invalid Status Return Level value: %d", value)
+	}
+
+	// Call Network.WriteData directly, rather than via servo.writeData, because
+	// the return status level will depend upon the new level, rather than the
+	// current level cache. We don't want to update that until we're sure that
+	// the write was successful.
+	err := servo.Network.WriteData(servo.Ident, (value == 2), reg.address, low(value))
+	if err != nil {
+		return err
+	}
+
+	// TODO: Remove this in favor of reading the cache.
+	servo.statusReturnLevel = value
+	return nil
+}
+
+func (servo *DynamixelServo) AlarmLED() (int, error) {
+	return servo.getRegister(*registers[alarmLed])
+}
+
+func (servo *DynamixelServo) SetAlarmLED(v int) error {
+	return servo.setRegister(*registers[alarmLed], v)
+}
+
+func (servo *DynamixelServo) AlarmShutdown() (int, error) {
+	return servo.getRegister(*registers[alarmShutdown])
+}
+
+func (servo *DynamixelServo) SetAlarmShutdown(v int) error {
+	return servo.setRegister(*registers[alarmShutdown], v)
 }
 
 func (servo *DynamixelServo) TorqueEnable() (bool, error) {
@@ -255,9 +387,8 @@ func (servo *DynamixelServo) TorqueEnable() (bool, error) {
 	return itob(v), err
 }
 
-// Enables or disables torque.
+// SetTorqueEnable enables or disables torque.
 func (servo *DynamixelServo) SetTorqueEnable(state bool) error {
-	servo.logMethod("SetTorqueEnable(%t)", state)
 	return servo.setRegister(*registers[torqueEnable], btoi(state))
 }
 
@@ -273,23 +404,49 @@ func (servo *DynamixelServo) SetLED(state bool) error {
 	return servo.setRegister(*registers[led], btoi(state))
 }
 
+func (servo *DynamixelServo) CWComplianceMargin() (int, error) {
+	return servo.getRegister(*registers[cwComplianceMargin])
+}
+
+func (servo *DynamixelServo) SetCWComplianceMargin(v int) error {
+	return servo.setRegister(*registers[cwComplianceMargin], v)
+}
+
+func (servo *DynamixelServo) CCWComplianceMargin() (int, error) {
+	return servo.getRegister(*registers[ccwComplianceMargin])
+}
+
+func (servo *DynamixelServo) SetCCWComplianceMarginval(v int) error {
+	return servo.setRegister(*registers[ccwComplianceMargin], v)
+}
+
+func (servo *DynamixelServo) CWComplianceSlope() (int, error) {
+	return servo.getRegister(*registers[cwComplianceSlope])
+}
+
+func (servo *DynamixelServo) SetCWComplianceSlope(v int) error {
+	return servo.setRegister(*registers[cwComplianceSlope], v)
+}
+
+func (servo *DynamixelServo) CCWComplianceSlope() (int, error) {
+	return servo.getRegister(*registers[ccwComplianceSlope])
+}
+
+func (servo *DynamixelServo) SetCCWComplianceSlope(v int) error {
+	return servo.setRegister(*registers[ccwComplianceSlope], v)
+}
+
 func (servo *DynamixelServo) GoalPosition() (int, error) {
 	return servo.getRegister(*registers[goalPosition])
 }
 
 // SetGoalPosition sets the goal position.
+//
+// TODO: Reject if the servo is in wheel mode (where CW and CCW angle limit
+//       is zero).
+//
 func (servo *DynamixelServo) SetGoalPosition(pos int) error {
-
-	// TODO: Reject if the servo is in wheel mode (where CW and CCW angle limit
-	//       is zero).
-
-	reg := *registers[goalPosition]
-
-	if pos < reg.min || pos > reg.max {
-		return errors.New("goal position out of range")
-	}
-
-	return servo.setRegister(reg, pos)
+	return servo.setRegister(*registers[goalPosition], pos)
 }
 
 // MovingSpeed returns the current moving speed. This is not the speed at which
@@ -298,7 +455,7 @@ func (servo *DynamixelServo) MovingSpeed() (int, error) {
 	return servo.getRegister(*registers[movingSpeed])
 }
 
-// Sets the moving speed.
+// SetMovingSpeed the moving speed.
 func (servo *DynamixelServo) SetMovingSpeed(speed int) error {
 	return servo.setRegister(*registers[movingSpeed], speed)
 }
@@ -313,6 +470,10 @@ func (servo *DynamixelServo) SetTorqueLimit(val int) error {
 
 func (servo *DynamixelServo) PresentPosition() (int, error) {
 	return servo.getRegister(*registers[presentPosition])
+}
+
+func (servo *DynamixelServo) PresentSpeed() (int, error) {
+	return servo.getRegister(*registers[presentSpeed])
 }
 
 func (servo *DynamixelServo) PresentVoltage() (int, error) {
@@ -341,9 +502,7 @@ func (servo *DynamixelServo) Lock() (int, error) {
 }
 
 func (servo *DynamixelServo) SetLock(isLocked int) error {
-	if isLocked > 1 || isLocked < 0 {
-		return errors.New("invalid lock value (must be zero or one)")
-	}
+	reg := *registers[lock]
 
 	// Can't unlock when servo is locked, so if we know that's the case, don't
 	// bother trying. Can be overriden by clearing the cache.
@@ -351,8 +510,6 @@ func (servo *DynamixelServo) SetLock(isLocked int) error {
 	// TODO: Add a method to read ints from the cache. If we used getRegister,
 	//       we risk accidentally (in the case of a bug) reading from the actual
 	//       device, which would be slow and weird.
-
-	reg := *registers[lock]
 
 	if isLocked == 0 && servo.cache[reg.address] == byte(1) {
 		return errors.New("EEPROM can't be unlocked; must be power-cycled")
@@ -380,9 +537,7 @@ func (servo *DynamixelServo) SetZero(offset float64) {
 	servo.zeroAngle = offset
 }
 
-//
 // Returns the current position of the servo, relative to the zero angle.
-//
 func (servo *DynamixelServo) Angle() (float64, error) {
 	pos, err := servo.Position()
 
@@ -398,69 +553,9 @@ func (servo *DynamixelServo) Angle() (float64, error) {
 // is the midpoint, 150 deg is max left (clockwise), and -150 deg is max right
 // (counter-clockwise). This is generally preferable to calling SetGoalPosition,
 // which uses the internal uint16 representation.
-//
-// If the angle is out of bounds
-//
 func (servo *DynamixelServo) MoveTo(angle float64) error {
 	pos := servo.angleToPos(normalizeAngle(angle))
 	return servo.SetGoalPosition(pos)
-}
-
-//
-// -- Low-level interface
-//
-//    These methods should follow the Dynamixel protocol docs as closely as
-//    possible, with no fancy stuff.
-//
-
-// Sets the status return level. Possible values are:
-//
-// 0 = Only respond to PING commands
-// 1 = Only respond to PING and READ commands
-// 2 = Respond to all commands
-//
-// Servos default to 2, but retain the value so long as they're powered up. This
-// makes it a very good idea to explicitly set the value after connecting, to
-// avoid waiting for status packets which will never arrive.
-//
-// See: dxl_ax_actuator.htm#Actuator_Address_10
-func (servo *DynamixelServo) SetStatusReturnLevel(value int) error {
-	servo.logMethod("SetStatusReturnLevel(%d)", value)
-
-	if value < 0 || value > 2 {
-		return fmt.Errorf("invalid Status Return Level value: %d", value)
-	}
-
-	// Call Network.WriteData directly, rather than via servo.writeData, because
-	// the return status level will depend upon the new level, rather than the
-	// current level cache. We don't want to update that until we're sure that
-	// the write was successful.
-	err := servo.Network.WriteData(servo.Ident, (value == 2), addrStatusReturnLevel, low(value))
-	if err != nil {
-		return err
-	}
-
-	servo.statusReturnLevel = value
-	return nil
-}
-
-// Changes the identity of the servo.
-// This is stored in EEPROM, so will persist between reboots.
-func (servo *DynamixelServo) SetIdent(ident int) error {
-	servo.logMethod("SetIdent(%d, %d)", ident)
-	i := low(ident)
-
-	if i < 0 || i > 252 {
-		return fmt.Errorf("invalid ID (must be 0-252): %d", i)
-	}
-
-	err := servo.writeData(addrID, i)
-	if err != nil {
-		return err
-	}
-
-	servo.Ident = i
-	return nil
 }
 
 // Voltage returns the current voltage supplied. Unlike the underlying register,
@@ -475,12 +570,19 @@ func (servo *DynamixelServo) Voltage() (float64, error) {
 	return (float64(val) / 10), nil
 }
 
-// Position is an alias for PresentPosition.
-func (servo *DynamixelServo) Position() (int, error) {
-	return servo.PresentPosition()
-}
-
 func (servo *DynamixelServo) logMethod(format string, v ...interface{}) {
 	prefix := fmt.Sprintf("servo[%d].", servo.Ident)
 	servo.Network.Log(prefix+format, v...)
+}
+
+// -- Aliases
+
+// SetIdent is a legacy alias for SetServoID.
+func (servo *DynamixelServo) SetIdent(ident int) error {
+	return servo.SetServoID(ident)
+}
+
+// Position is a legacy alias for PresentPosition.
+func (servo *DynamixelServo) Position() (int, error) {
+	return servo.PresentPosition()
 }
