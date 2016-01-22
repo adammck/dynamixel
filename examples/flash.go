@@ -47,7 +47,7 @@ func main() {
 	led := false
 	for {
 		led = !led
-		servo.SetLed(led)
+		servo.SetLED(led)
 		time.Sleep(time.Duration(*interval) * time.Millisecond)
 	}
 }
