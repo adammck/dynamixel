@@ -523,9 +523,14 @@ type mockNetwork struct {
 }
 
 // servo returns a real Servo backed by a mock network, where the control table
-// initially contains the given bytes.
+// initially contains the given bytes. The control table is empty, except that
+// the servo ID is 1, and the status return level is 2. (This is just to avoid
+// having to specify the same values for every test.)
 func servo(b map[int]byte) (*mockNetwork, *DynamixelServo) {
 	n := &mockNetwork{}
+
+	n.controlTable[0x03] = byte(0x01) // servoID
+	n.controlTable[0x10] = byte(0x02) // statusReturnLevel
 
 	for addr, val := range b {
 		n.controlTable[addr] = val

@@ -9,13 +9,9 @@ import (
 const (
 
 	// Control table size (in bytes)
-	// TODO: Instead of hard-coding this, maybe calculate the size by finding the
-	//       highest register address and adding its length?
+	// TODO: Instead of hard-coding this, maybe calculate the size by finding
+	//       the highest register address and adding its length?
 	tableSize = 50
-
-	// Control Table Addresses (EEPROM)
-	addrID                byte = 0x03 // 1
-	addrStatusReturnLevel byte = 0x10 // 1
 
 	// Unit conversions
 	maxPos          uint16  = 1023
@@ -26,7 +22,6 @@ const (
 
 type DynamixelServo struct {
 	Network   Networker
-	Ident     uint8
 	zeroAngle float64
 
 	// Cache of control table values
@@ -35,22 +30,21 @@ type DynamixelServo struct {
 
 // NewServo returns a new DynamixelServo with its cache populated.
 // TODO: Return a pointer, error tuple! We're currently ignoring the return
-//       value of the updateCache call.
+//       value of the populateCache call.
 func NewServo(network Networker, ident uint8) *DynamixelServo {
 	s := &DynamixelServo{
 		Network:   network,
-		Ident:     ident,
 		zeroAngle: 150,
 	}
 
-	_ = s.updateCache()
+	_ = s.populateCache(ident)
 	return s
 }
 
-// updateCache reads the entire control table from the servo, and stores it in
+// populateCache reads the entire control table from the servo, and stores it in
 // the cache.
-func (servo *DynamixelServo) updateCache() error {
-	b, err := servo.Network.ReadData(servo.Ident, 0x0, tableSize)
+func (servo *DynamixelServo) populateCache(ident uint8) error {
+	b, err := servo.Network.ReadData(ident, 0x0, tableSize)
 	if err != nil {
 		return err
 	}
@@ -80,11 +74,20 @@ func (servo *DynamixelServo) getRegister(reg Register) (int, error) {
 			return 0, fmt.Errorf("invalid register length: %d", reg.length)
 		}
 
-		if servo.StatusReturnLevel() == 0 {
+		rl, err := servo.StatusReturnLevel()
+		if err != nil {
+			return 0, err
+		}
+		if rl == 0 {
 			return 0, errors.New("can't READ while Status Return Level is zero")
 		}
 
-		b, err := servo.Network.ReadData(servo.Ident, reg.address, reg.length)
+		ident, err := servo.ServoID()
+		if err != nil {
+			return 0, err
+		}
+
+		b, err := servo.Network.ReadData(uint8(ident), reg.address, reg.length)
 		if err != nil {
 			return 0, err
 		}
@@ -108,7 +111,7 @@ func (servo *DynamixelServo) getRegister(reg Register) (int, error) {
 
 // getCached returns an int from the servo's control table cache, or an error.
 // It's not (currently) possible to distinguish zero from an unpopulated cache,
-// so be sure to call updateCache before trying to use this.
+// so be sure to call populateCache before trying to use this.
 func (servo *DynamixelServo) getCached(reg Register) (int, error) {
 
 	// TODO: Does this really need to be repeated here and in getRegister?
@@ -169,25 +172,27 @@ func (servo *DynamixelServo) setRegister(reg Register, value int) error {
 // nil if the ping succeeds, otherwise an error. It's optional, but a very good
 // idea, to call this before sending any other instructions to the servo.
 func (servo *DynamixelServo) Ping() error {
-	return servo.Network.Ping(servo.Ident)
-}
-
-func (servo *DynamixelServo) readInt(addr byte, n int) (int, error) {
-	if servo.statusReturnLevel == 0 {
-		return 0, errors.New("can't READ while Status Return Level is zero")
-	}
-
-	b, err := servo.Network.ReadData(servo.Ident, addr, n)
+	ident, err := servo.ServoID()
 	if err != nil {
-		return 0, err
+		return err
 	}
 
-	return bytesToInt(b)
+	return servo.Network.Ping(uint8(ident))
 }
 
 // TODO: Remove this in favor of setRegister?
 func (servo *DynamixelServo) writeData(params ...byte) error {
-	return servo.Network.WriteData(servo.Ident, (servo.statusReturnLevel == 2), params...)
+	ident, err := servo.ServoID()
+	if err != nil {
+		return err
+	}
+
+	rl, err := servo.StatusReturnLevel()
+	if err != nil {
+		return err
+	}
+
+	return servo.Network.WriteData(uint8(ident), (rl == 2), params...)
 }
 
 func posDistance(a uint16, b uint16) uint16 {
@@ -220,7 +225,7 @@ func normalizeAngle(d float64) float64 {
 //
 // TODO: These methods should probably be generated from the list of registers,
 //       especially if/when we support multiple models with different sets.
-///
+//
 // modelNumber
 // firmwareVersion
 // servoID*
@@ -270,16 +275,7 @@ func (servo *DynamixelServo) ServoID() (int, error) {
 // SetServoID changes the identity of the servo.
 // This is stored in EEPROM, so will persist between reboots.
 func (servo *DynamixelServo) SetServoID(ident int) error {
-	servo.logMethod("SetIdent(%d, %d)", ident)
-
-	err := servo.setRegister(*registers[servoID], ident)
-	if err != nil {
-		return err
-	}
-
-	// TODO: Get rid of this and use the cache.
-	servo.Ident = uint8(ident)
-	return nil
+	return servo.setRegister(*registers[servoID], ident)
 }
 
 func (servo *DynamixelServo) BaudRate() (int, error) {
@@ -362,24 +358,26 @@ func (servo *DynamixelServo) StatusReturnLevel() (int, error) {
 //
 // See: dxl_ax_actuator.htm#Actuator_Address_10
 func (servo *DynamixelServo) SetStatusReturnLevel(value int) error {
-	servo.logMethod("SetStatusReturnLevel(%d)", value)
 	reg := *registers[statusReturnLevel]
 
 	if value < reg.min || value > reg.max {
 		return fmt.Errorf("invalid Status Return Level value: %d", value)
 	}
 
-	// Call Network.WriteData directly, rather than via servo.writeData, because
-	// the return status level will depend upon the new level, rather than the
-	// current level cache. We don't want to update that until we're sure that
-	// the write was successful.
-	err := servo.Network.WriteData(servo.Ident, (value == 2), reg.address, low(value))
+	ident, err := servo.ServoID()
 	if err != nil {
 		return err
 	}
 
-	// TODO: Remove this in favor of reading the cache.
-	servo.statusReturnLevel = value
+	// Call Network.WriteData directly, rather than via servo.writeData, because
+	// the return status level will depend upon the new level, rather than the
+	// current level cache. We don't want to update that until we're sure that
+	// the write was successful.
+	err = servo.Network.WriteData(uint8(ident), (value == 2), reg.address, low(value))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -588,7 +586,14 @@ func (servo *DynamixelServo) Voltage() (float64, error) {
 }
 
 func (servo *DynamixelServo) logMethod(format string, v ...interface{}) {
-	prefix := fmt.Sprintf("servo[%d].", servo.Ident)
+
+	// Include the servo ID if possible, but log even if it's unknown.
+	ident, err := servo.ServoID()
+	if err != nil {
+		ident = 0
+	}
+
+	prefix := fmt.Sprintf("servo[%s].", ident)
 	servo.Network.Log(prefix+format, v...)
 }
 
