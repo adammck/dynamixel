@@ -66,73 +66,62 @@ func (servo *DynamixelServo) populateCache(ident uint8) error {
 // getRegister fetches the value of a register from the cache if possible,
 // otherwise reads it from the control table (and caches it).
 func (servo *DynamixelServo) getRegister(reg Register) (int, error) {
-	if reg.cacheable {
-		return servo.getCached(reg)
-
-	} else {
-		if reg.length != 1 && reg.length != 2 {
-			return 0, fmt.Errorf("invalid register length: %d", reg.length)
-		}
-
-		rl, err := servo.StatusReturnLevel()
-		if err != nil {
-			return 0, err
-		}
-		if rl == 0 {
-			return 0, errors.New("can't READ while Status Return Level is zero")
-		}
-
-		ident, err := servo.ServoID()
-		if err != nil {
-			return 0, err
-		}
-
-		b, err := servo.Network.ReadData(uint8(ident), reg.address, reg.length)
-		if err != nil {
-			return 0, err
-		}
-
-		switch len(b) {
-		case 1:
-			servo.cache[reg.address] = b[0]
-			return int(b[0]), nil
-
-		case 2:
-			servo.cache[reg.address] = b[0]
-			servo.cache[reg.address+1] = b[1]
-			return int(b[0]) | int(b[1])<<8, nil
-
-		default:
-			return 0, fmt.Errorf("expected %d bytes, got %d", reg.length, len(b))
-
-		}
-	}
-}
-
-// getCached returns an int from the servo's control table cache, or an error.
-// It's not (currently) possible to distinguish zero from an unpopulated cache,
-// so be sure to call populateCache before trying to use this.
-func (servo *DynamixelServo) getCached(reg Register) (int, error) {
-
-	// TODO: Does this really need to be repeated here and in getRegister?
 
 	if reg.length != 1 && reg.length != 2 {
 		return 0, fmt.Errorf("invalid register length: %d", reg.length)
 	}
 
-	// Abort rather than returning a stale value.
+	// If the register is cacheable, read the value from the cache and return
+	// that. The populateCache method must have been called first.
 
-	if !reg.cacheable {
-		return 0, fmt.Errorf("register %#02x is uncacheable", reg.address)
+	if reg.cacheable {
+		v := int(servo.cache[reg.address])
+
+		if reg.length == 2 {
+			v |= int(servo.cache[reg.address+1]) << 8
+		}
+
+		return v, nil
 	}
 
-	v := int(servo.cache[reg.address])
+	// Abort if return level is zero.
 
-	if reg.length == 2 {
-		v |= int(servo.cache[reg.address+1]) << 8
+	rl, err := servo.StatusReturnLevel()
+	if err != nil {
+		return 0, err
+	}
+	if rl == 0 {
+		return 0, errors.New("can't READ while Status Return Level is zero")
 	}
 
-	return v, nil
+	// Fetch the servo ident from the cache.
+
+	ident, err := servo.ServoID()
+	if err != nil {
+		return 0, err
+	}
+
+	// Read the single value from the control table.
+
+	b, err := servo.Network.ReadData(uint8(ident), reg.address, reg.length)
+	if err != nil {
+		return 0, err
+	}
+
+	switch len(b) {
+	case 1:
+		servo.cache[reg.address] = b[0]
+		return int(b[0]), nil
+
+	case 2:
+		servo.cache[reg.address] = b[0]
+		servo.cache[reg.address+1] = b[1]
+		return int(b[0]) | int(b[1])<<8, nil
+
+	default:
+		return 0, fmt.Errorf("expected %d bytes, got %d", reg.length, len(b))
+
+	}
 }
 
 // setRegister writes a value to the given register. Returns an error if the
@@ -343,7 +332,7 @@ func (servo *DynamixelServo) SetMaxTorque(v int) error {
 }
 
 func (servo *DynamixelServo) StatusReturnLevel() (int, error) {
-	return servo.getCached(*registers[statusReturnLevel])
+	return servo.getRegister(*registers[statusReturnLevel])
 }
 
 // Sets the status return level. Possible values are:
