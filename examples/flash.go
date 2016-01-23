@@ -40,14 +40,14 @@ func main() {
 	servo := dynamixel.NewServo(network, uint8(*servoId))
 	err = servo.Ping()
 	if err != nil {
-		fmt.Println("ping error: %s\n", err)
+		fmt.Printf("ping error: %s\n", err)
 		os.Exit(1)
 	}
 
 	led := false
 	for {
 		led = !led
-		servo.SetLed(led)
+		servo.SetLED(led)
 		time.Sleep(time.Duration(*interval) * time.Millisecond)
 	}
 }

@@ -24,6 +24,15 @@ const (
 	BroadcastIdent byte = 0xFE // 254
 )
 
+// Networker provides an interface to the underlying servos' control tables by
+// reading and writing to/from the network interface.
+type Networker interface {
+	Ping(uint8) error
+	ReadData(uint8, byte, int) ([]byte, error)
+	WriteData(uint8, bool, ...byte) error
+	Log(string, ...interface{})
+}
+
 type DynamixelNetwork struct {
 	Serial   io.ReadWriteCloser
 	Buffered bool
@@ -42,25 +51,21 @@ func NewNetwork(serial io.ReadWriteCloser) *DynamixelNetwork {
 	}
 }
 
-//
-// Puts the network in bufferred write mode, which means that the REG_WRITE
-// instruction will be used, rather than WRITE_DATA. This causes calls to
-// WriteData to be bufferred until the Action method is called, at which time
+// SetBuffered puts the network in bufferred write mode, which means that the
+// REG_WRITE instruction will be used, rather than WRITE_DATA. This causes calls
+// to WriteData to be bufferred until the Action method is called, at which time
 // they'll all be executed at once.
 //
 // This is very useful for synchronizing the movements of multiple servos.
-//
 func (n *DynamixelNetwork) SetBuffered(buffered bool) {
 	n.Buffered = buffered
 }
 
-//
-// Converts an error byte (as included in a status packet) into an error object
-// with a friendly error message. We can't be too specific about it, because any
-// combination of errors might occur at the same time.
+// DecodeStartusError Converts an error byte (as included in a status packet)
+// into an error object with a friendly error message. We can't be too specific
+// about it, because any combination of errors might occur at the same time.
 //
 // See: http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm#Status_Packet
-//
 func DecodeStatusError(errBits byte) error {
 	str := []string{}
 
@@ -99,12 +104,11 @@ func DecodeStatusError(errBits byte) error {
 	return fmt.Errorf("status error(s): %s", strings.Join(str, ", "))
 }
 
-//
 // This stuff is generic to all Dynamixels. See:
 //
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_instruction.htm
-//
+
 func (network *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte, params ...byte) error {
 	buf := new(bytes.Buffer)
 	paramsLength := byte(len(params) + 2)
@@ -143,11 +147,10 @@ func (network *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte,
 	return nil
 }
 
-//
-// Reads `n` bytes, blocking if they're not immediately available. Returns a
-// slice containing the bytes read. If the network timeout is reached, returns
-// the bytes read so far (which might be none) and an error.
-//
+// read receives the next n bytes from the network, blocking if they're not
+// immediately available. Returns a slice containing the bytes read. If the
+// network timeout is reached, returns the bytes read so far (which might be
+// none) and an error.
 func (network *DynamixelNetwork) read(n int) ([]byte, error) {
 	start := time.Now()
 	buf := make([]byte, n)
@@ -290,7 +293,8 @@ func (n *DynamixelNetwork) Ping(ident uint8) error {
 }
 
 // ReadData reads a slice of n bytes from the control table of the given servo
-// ID. The ReadInt method is usually more useful.
+// ID. Use the bytesToInt function to convert the output to something more
+// useful.
 func (network *DynamixelNetwork) ReadData(ident uint8, addr byte, n int) ([]byte, error) {
 	params := []byte{addr, byte(n)}
 	err := network.WriteInstruction(ident, ReadData, params...)
@@ -304,32 +308,6 @@ func (network *DynamixelNetwork) ReadData(ident uint8, addr byte, n int) ([]byte
 	}
 
 	return buf, nil
-}
-
-// ReadInt reads an unsigned integer from the control table of the given servo
-// ID. Only 8- and 16-bit uints are supported, because those are the only thing
-// the control table contains.
-func (network *DynamixelNetwork) ReadInt(ident uint8, addr byte, n int) (int, error) {
-	if n != 1 && n != 2 {
-		return 0, fmt.Errorf("invalid read length %d", n)
-	}
-
-	b, err := network.ReadData(ident, addr, n)
-	if err != nil {
-		return 0, err
-	}
-
-	switch len(b) {
-	case 1:
-		return int(b[0]), nil
-
-	case 2:
-		return int(b[0]) | int(b[1])<<8, nil
-
-	default:
-		return 0, fmt.Errorf("expected %d bytes, got %d", n, len(b))
-
-	}
 }
 
 func (n *DynamixelNetwork) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {
@@ -356,13 +334,9 @@ func (n *DynamixelNetwork) WriteData(ident uint8, expectStausPacket bool, params
 	return nil
 }
 
-//
-// Broadcasts the ACTION instruction, which initiates any previously bufferred
-// instructions.
-//
-// Doesn't wait for a status packet in response, because they are not sent in
-// response to broadcast instructions.
-//
+// Action broadcasts the ACTION instruction, which initiates any previously
+// bufferred instructions. Doesn't wait for a status packet in response, because
+// they are not sent in response to broadcast instructions.
 func (n *DynamixelNetwork) Action() error {
 	return n.WriteInstruction(BroadcastIdent, Action)
 }
