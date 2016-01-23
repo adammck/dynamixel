@@ -1,4 +1,4 @@
-package dynamixel
+package network
 
 import (
 	"bytes"
@@ -33,7 +33,7 @@ type Networker interface {
 	Log(string, ...interface{})
 }
 
-type DynamixelNetwork struct {
+type Network struct {
 	Serial   io.ReadWriteCloser
 	Buffered bool
 	Debug    bool
@@ -42,8 +42,8 @@ type DynamixelNetwork struct {
 	Timeout time.Duration
 }
 
-func NewNetwork(serial io.ReadWriteCloser) *DynamixelNetwork {
-	return &DynamixelNetwork{
+func New(serial io.ReadWriteCloser) *Network {
+	return &Network{
 		Serial:   serial,
 		Buffered: false,
 		Debug:    false,
@@ -57,7 +57,7 @@ func NewNetwork(serial io.ReadWriteCloser) *DynamixelNetwork {
 // they'll all be executed at once.
 //
 // This is very useful for synchronizing the movements of multiple servos.
-func (n *DynamixelNetwork) SetBuffered(buffered bool) {
+func (n *Network) SetBuffered(buffered bool) {
 	n.Buffered = buffered
 }
 
@@ -109,7 +109,7 @@ func DecodeStatusError(errBits byte) error {
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_instruction.htm
 
-func (network *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte, params ...byte) error {
+func (network *Network) WriteInstruction(ident uint8, instruction byte, params ...byte) error {
 	buf := new(bytes.Buffer)
 	paramsLength := byte(len(params) + 2)
 
@@ -151,7 +151,7 @@ func (network *DynamixelNetwork) WriteInstruction(ident uint8, instruction byte,
 // immediately available. Returns a slice containing the bytes read. If the
 // network timeout is reached, returns the bytes read so far (which might be
 // none) and an error.
-func (network *DynamixelNetwork) read(n int) ([]byte, error) {
+func (network *Network) read(n int) ([]byte, error) {
 	start := time.Now()
 	buf := make([]byte, n)
 	m := 0
@@ -174,7 +174,7 @@ func (network *DynamixelNetwork) read(n int) ([]byte, error) {
 	return buf, nil
 }
 
-func (network *DynamixelNetwork) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
+func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 
 	//
 	// Status packets are similar to instruction packet:
@@ -274,7 +274,7 @@ func (network *DynamixelNetwork) ReadStatusPacket(expectIdent uint8) ([]byte, er
 
 // Ping sends the PING instruction to the given Servo ID, and waits for the
 // response. Returns an error if the ping fails, or nil if it succeeds.
-func (n *DynamixelNetwork) Ping(ident uint8) error {
+func (n *Network) Ping(ident uint8) error {
 	n.Log("Ping(%d)", ident)
 
 	writeErr := n.WriteInstruction(ident, Ping)
@@ -295,7 +295,7 @@ func (n *DynamixelNetwork) Ping(ident uint8) error {
 // ReadData reads a slice of n bytes from the control table of the given servo
 // ID. Use the bytesToInt function to convert the output to something more
 // useful.
-func (network *DynamixelNetwork) ReadData(ident uint8, addr byte, n int) ([]byte, error) {
+func (network *Network) ReadData(ident uint8, addr byte, n int) ([]byte, error) {
 	params := []byte{addr, byte(n)}
 	err := network.WriteInstruction(ident, ReadData, params...)
 	if err != nil {
@@ -310,7 +310,7 @@ func (network *DynamixelNetwork) ReadData(ident uint8, addr byte, n int) ([]byte
 	return buf, nil
 }
 
-func (n *DynamixelNetwork) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {
+func (n *Network) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {
 	var instruction byte
 
 	if n.Buffered {
@@ -337,11 +337,11 @@ func (n *DynamixelNetwork) WriteData(ident uint8, expectStausPacket bool, params
 // Action broadcasts the ACTION instruction, which initiates any previously
 // bufferred instructions. Doesn't wait for a status packet in response, because
 // they are not sent in response to broadcast instructions.
-func (n *DynamixelNetwork) Action() error {
+func (n *Network) Action() error {
 	return n.WriteInstruction(BroadcastIdent, Action)
 }
 
-func (n *DynamixelNetwork) Log(format string, v ...interface{}) {
+func (n *Network) Log(format string, v ...interface{}) {
 	if n.Debug {
 		log.Printf(format, v...)
 	}
@@ -350,7 +350,7 @@ func (n *DynamixelNetwork) Log(format string, v ...interface{}) {
 // Flush reads as much data as it can from the buffer, until it times out. It's
 // useful to call this when starting up, in case a previous process crashed and
 // left garbage in the buffer.
-func (n *DynamixelNetwork) Flush() {
+func (n *Network) Flush() {
 	n.Log("Flush()")
 	for {
 		b, err := n.read(1)

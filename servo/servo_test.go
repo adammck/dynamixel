@@ -1,8 +1,9 @@
-package dynamixel
+package servo
 
 import (
 	"testing"
 
+	"github.com/adammck/dynamixel"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +22,7 @@ func TestCacheIsPopulated(t *testing.T) {
 		},
 	}
 
-	servo := NewServo(n, 1)
+	servo := New(n, 1)
 	assert.Equal(t, servo.cache, n.controlTable)
 }
 
@@ -35,24 +36,24 @@ func TestGetRegister(t *testing.T) {
 	servo.cache[0x03] = byte(0x88)
 
 	// invalid register length
-	x, err := servo.getRegister(Register{0x00, 3, ro, true, 0, 1})
+	x, err := servo.getRegister(dynamixel.Register{0x00, 3, dynamixel.RO, true, 0, 1})
 	assert.Error(t, err)
 	assert.Equal(t, 0, x)
 
 	// one byte (cached)
-	a, err := servo.getRegister(Register{0x00, 1, ro, true, 0, 1})
+	a, err := servo.getRegister(dynamixel.Register{0x00, 1, dynamixel.RO, true, 0, 1})
 	assert.Nil(t, err)
 	assert.Equal(t, 0x99, a)
 
 	// two bytes (cached)
-	b, err := servo.getRegister(Register{byte(1), 2, ro, true, 0, 1})
+	b, err := servo.getRegister(dynamixel.Register{byte(1), 2, dynamixel.RO, true, 0, 1})
 	assert.Nil(t, err)
 	assert.Equal(t, 0x2010, b) // 0x10(L) | 0x20(H)<<8
 
 	// one byte (immediate)
 	servo.cache[0x02] = 0x77
 	n.controlTable[0x02] = 0x88
-	c, err := servo.getRegister(Register{0x02, 1, ro, false, 0, 1})
+	c, err := servo.getRegister(dynamixel.Register{0x02, 1, dynamixel.RO, false, 0, 1})
 	assert.Nil(t, err)
 	assert.Equal(t, 0x88, c)
 	assert.Equal(t, byte(0x88), servo.cache[0x02], "servo cache should have been updated")
@@ -62,19 +63,19 @@ func TestSetRegister(t *testing.T) {
 	n, servo := servo(map[int]byte{})
 
 	// read only register can't be set
-	err := servo.setRegister(Register{0x00, 1, ro, true, 0, 1}, 1)
+	err := servo.setRegister(dynamixel.Register{0x00, 1, dynamixel.RO, true, 0, 1}, 1)
 	assert.Equal(t, byte(0), n.controlTable[0])
 	assert.Equal(t, byte(0), servo.cache[0])
 	assert.Error(t, err)
 
 	// read/write single byte
-	err = servo.setRegister(Register{0x01, 1, rw, true, 0, 2}, 2)
+	err = servo.setRegister(dynamixel.Register{0x01, 1, dynamixel.RW, true, 0, 2}, 2)
 	assert.NoError(t, err)
 	assert.Equal(t, byte(2), n.controlTable[1], "control table should have been written")
 	assert.Equal(t, byte(2), servo.cache[1], "servo cache should have been updated")
 
 	// read/write two bytes
-	err = servo.setRegister(Register{0x02, 2, rw, true, 0, 2048}, 1025)
+	err = servo.setRegister(dynamixel.Register{0x02, 2, dynamixel.RW, true, 0, 2048}, 1025)
 	assert.NoError(t, err)
 	assert.Equal(t, byte(0x01), n.controlTable[2], "low byte of control table should have been written")
 	assert.Equal(t, byte(0x04), n.controlTable[3], "high byte of control table should have been written")
@@ -82,13 +83,13 @@ func TestSetRegister(t *testing.T) {
 	assert.Equal(t, byte(0x04), servo.cache[3], "high byte of servo cache should have been updated")
 
 	// write too-low value with one byte
-	err = servo.setRegister(Register{0x04, 1, rw, true, 2, 3}, 1)
+	err = servo.setRegister(dynamixel.Register{0x04, 1, dynamixel.RW, true, 2, 3}, 1)
 	assert.EqualError(t, err, "value too low: 1 (min=2)")
 	assert.Equal(t, byte(0x00), n.controlTable[4], "control table should NOT have been written")
 	assert.Equal(t, byte(0x00), servo.cache[4], "servo cache should NOT have been updated")
 
 	// write too-high value with one byte
-	err = servo.setRegister(Register{0x05, 1, rw, true, 2, 3}, 4)
+	err = servo.setRegister(dynamixel.Register{0x05, 1, dynamixel.RW, true, 2, 3}, 4)
 	assert.EqualError(t, err, "value too high: 4 (max=3)")
 	assert.Equal(t, byte(0x00), n.controlTable[5], "control table should NOT have been written")
 	assert.Equal(t, byte(0x00), servo.cache[5], "servo cache should NOT have been updated")
@@ -211,7 +212,7 @@ func TestSetTorqueEnable(t *testing.T) {
 
 func TestLED(t *testing.T) {
 	n := &mockNetwork{}
-	s := NewServo(n, 1)
+	s := New(n, 1)
 
 	s.cache[0x19] = 0
 	val, err := s.LED()
@@ -226,7 +227,7 @@ func TestLED(t *testing.T) {
 
 func TestSetLED(t *testing.T) {
 	n := &mockNetwork{}
-	s := NewServo(n, 1)
+	s := New(n, 1)
 
 	err := s.SetLED(true)
 	assert.NoError(t, err)
@@ -320,7 +321,7 @@ func TestMovingSpeed(t *testing.T) {
 
 func TestSetMovingSpeed(t *testing.T) {
 	n := &mockNetwork{}
-	s := NewServo(n, 1)
+	s := New(n, 1)
 
 	err := s.SetMovingSpeed(513)
 	assert.NoError(t, err)
@@ -502,7 +503,7 @@ type mockNetwork struct {
 // initially contains the given bytes. The control table is empty, except that
 // the servo ID is 1, and the status return level is 2. (This is just to avoid
 // having to specify the same values for every test.)
-func servo(b map[int]byte) (*mockNetwork, *DynamixelServo) {
+func servo(b map[int]byte) (*mockNetwork, *Servo) {
 	n := &mockNetwork{}
 
 	n.controlTable[0x03] = byte(0x01) // servoID
@@ -512,7 +513,7 @@ func servo(b map[int]byte) (*mockNetwork, *DynamixelServo) {
 		n.controlTable[addr] = val
 	}
 
-	s := NewServo(n, 1)
+	s := New(n, 1)
 	return n, s
 }
 

@@ -1,4 +1,4 @@
-package dynamixel
+package utils
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -32,30 +32,30 @@ func TestBytesToInt(t *testing.T) {
 	}
 }
 
-func TestBtoi(t *testing.T) {
-	assert.Equal(t, 1, btoi(true))
-	assert.Equal(t, 0, btoi(false))
+func TestBoolToInt(t *testing.T) {
+	assert.Equal(t, 1, BoolToInt(true))
+	assert.Equal(t, 0, BoolToInt(false))
 }
 
 func TestItob(t *testing.T) {
-	assert.Equal(t, true, itob(-1))
-	assert.Equal(t, false, itob(0))
-	assert.Equal(t, true, itob(1))
-	assert.Equal(t, true, itob(2))
+	assert.Equal(t, true, IntToBool(-1))
+	assert.Equal(t, false, IntToBool(0))
+	assert.Equal(t, true, IntToBool(1))
+	assert.Equal(t, true, IntToBool(2))
 }
 
 func TestLow(t *testing.T) {
-	assert.Equal(t, byte(0), low(0))
-	assert.Equal(t, byte(0x1), low(1))
-	assert.Equal(t, byte(0xff), low(1023))
-	assert.Equal(t, byte(0x0), low(1024))
-	assert.Equal(t, byte(0x1), low(1025))
+	assert.Equal(t, byte(0), Low(0))
+	assert.Equal(t, byte(0x1), Low(1))
+	assert.Equal(t, byte(0xff), Low(1023))
+	assert.Equal(t, byte(0x0), Low(1024))
+	assert.Equal(t, byte(0x1), Low(1025))
 }
 
 func TestHigh(t *testing.T) {
-	assert.Equal(t, byte(0), high(0))
-	assert.Equal(t, byte(0), high(1))
-	assert.Equal(t, byte(0x3), high(1023))
-	assert.Equal(t, byte(0x4), high(1024))
-	assert.Equal(t, byte(0x4), high(1025))
+	assert.Equal(t, byte(0), High(0))
+	assert.Equal(t, byte(0), High(1))
+	assert.Equal(t, byte(0x3), High(1023))
+	assert.Equal(t, byte(0x4), High(1024))
+	assert.Equal(t, byte(0x4), High(1025))
 }

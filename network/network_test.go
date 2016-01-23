@@ -1,4 +1,4 @@
-package dynamixel
+package network
 
 import (
 	"testing"
