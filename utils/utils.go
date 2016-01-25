@@ -1,4 +1,4 @@
-package dynamixel
+package utils
 
 import (
 	"fmt"
@@ -21,23 +21,23 @@ func bytesToInt(b []byte) (int, error) {
 	}
 }
 
-// btoi converts a bool to an int.
-func btoi(b bool) int {
+// BoolToInt converts a bool to an int.
+func BoolToInt(b bool) int {
 	if b {
 		return 1
 	}
 	return 0
 }
 
-// itob converts an int to a bool.
-func itob(v int) bool {
+// IntToBool converts an int to a bool.
+func IntToBool(v int) bool {
 	return (v != 0)
 }
 
-func low(i int) byte {
+func Low(i int) byte {
 	return byte(i & 0xFF)
 }
 
-func high(i int) byte {
-	return low(i >> 8)
+func High(i int) byte {
+	return Low(i >> 8)
 }
