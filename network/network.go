@@ -30,7 +30,6 @@ type Networker interface {
 	Ping(uint8) error
 	ReadData(uint8, byte, int) ([]byte, error)
 	WriteData(uint8, bool, ...byte) error
-	Log(string, ...interface{})
 }
 
 type Network struct {

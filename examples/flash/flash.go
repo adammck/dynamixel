@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/adammck/dynamixel/network"
-	"github.com/adammck/dynamixel/servo"
+	"github.com/adammck/dynamixel/servo/ax"
 	"github.com/jacobsa/go-serial/serial"
 	"os"
 	"time"
@@ -38,7 +38,12 @@ func main() {
 	network := network.New(serial)
 	network.Debug = *debug
 
-	servo := servo.New(network, uint8(*servoId))
+	servo, err := ax.New(network, *servoId)
+	if err != nil {
+		fmt.Printf("servo init error: %s\n", err)
+		os.Exit(1)
+	}
+
 	err = servo.Ping()
 	if err != nil {
 		fmt.Printf("ping error: %s\n", err)
