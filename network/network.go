@@ -345,18 +345,3 @@ func (n *Network) Log(format string, v ...interface{}) {
 		log.Printf(format, v...)
 	}
 }
-
-// Flush reads as much data as it can from the buffer, until it times out. It's
-// useful to call this when starting up, in case a previous process crashed and
-// left garbage in the buffer.
-func (n *Network) Flush() {
-	n.Log("Flush()")
-	for {
-		b, err := n.read(1)
-		n.Log("<< %#v (garbage)\n", b)
-		if err != nil {
-			n.Log("!! %s\n", err)
-			return
-		}
-	}
-}
