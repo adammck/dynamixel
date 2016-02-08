@@ -1,5 +1,6 @@
 package registers
 
+//go:generate stringer -type=RegName
 type RegName int
 type Access int
 type Map map[RegName]*Register
