@@ -33,10 +33,10 @@ func TestGetRegister(t *testing.T) {
 	oneByte := reg.RegName(4)
 
 	m := reg.Map{
-		invalidLength:  &reg.Register{0x00, 3, reg.RO, true, 0, 1},
-		oneByteCached:  &reg.Register{0x00, 1, reg.RO, true, 0, 1},
-		twoBytesCached: &reg.Register{byte(1), 2, reg.RO, true, 0, 1},
-		oneByte:        &reg.Register{0x02, 1, reg.RO, false, 0, 1},
+		invalidLength:  &reg.Register{Address: 0x00, Length: 3, Access: reg.RO, Cacheable: true, Min: 0, Max: 1},
+		oneByteCached:  &reg.Register{Address: 0x00, Length: 1, Access: reg.RO, Cacheable: true, Min: 0, Max: 1},
+		twoBytesCached: &reg.Register{Address: 0x01, Length: 2, Access: reg.RO, Cacheable: true, Min: 0, Max: 1},
+		oneByte:        &reg.Register{Address: 0x02, Length: 1, Access: reg.RO, Cacheable: false, Min: 0, Max: 1},
 	}
 
 	n, servo := servo(m, map[int]byte{})
@@ -77,9 +77,9 @@ func TestSetRegister(t *testing.T) {
 	rwTwoByte := reg.RegName(3)
 
 	m := reg.Map{
-		readOnly:  &reg.Register{0x00, 1, reg.RO, true, 0, 1},
-		rwOneByte: &reg.Register{0x01, 1, reg.RW, false, 2, 3},
-		rwTwoByte: &reg.Register{0x02, 2, reg.RW, false, 0, 2048},
+		readOnly:  &reg.Register{Address: 0x00, Length: 1, Access: reg.RO, Cacheable: true, Min: 0, Max: 1},
+		rwOneByte: &reg.Register{Address: 0x01, Length: 1, Access: reg.RW, Cacheable: false, Min: 2, Max: 3},
+		rwTwoByte: &reg.Register{Address: 0x02, Length: 2, Access: reg.RW, Cacheable: false, Min: 0, Max: 2048},
 	}
 
 	n, servo := servo(m, map[int]byte{})

@@ -78,7 +78,7 @@ func (servo *Servo) populateCache() error {
 func (servo *Servo) getRegister(n reg.RegName) (int, error) {
 	r, ok := servo.registers[n]
 	if !ok {
-		return 0, fmt.Errorf("can't read unsupported register: %s", n)
+		return 0, fmt.Errorf("can't read unsupported register: %v", n)
 	}
 
 	if r.Length != 1 && r.Length != 2 {
@@ -136,7 +136,7 @@ func (servo *Servo) getRegister(n reg.RegName) (int, error) {
 func (servo *Servo) setRegister(n reg.RegName, value int) error {
 	r, ok := servo.registers[n]
 	if !ok {
-		return fmt.Errorf("can't write to unsupported register: %s", n)
+		return fmt.Errorf("can't write to unsupported register: %v", n)
 	}
 
 	if r.Access == reg.RO {
