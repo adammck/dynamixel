@@ -6,6 +6,7 @@ import (
 	"github.com/adammck/dynamixel/network"
 	"github.com/adammck/dynamixel/servo/ax"
 	"github.com/jacobsa/go-serial/serial"
+	"log"
 	"os"
 )
 
@@ -35,7 +36,9 @@ func main() {
 	}
 
 	network := network.New(serial)
-	network.Debug = *debug
+	if *debug {
+		network.Logger = log.New(os.Stderr, "", log.LstdFlags)
+	}
 
 	servo, err := ax.New(network, *servoId)
 	if err != nil {

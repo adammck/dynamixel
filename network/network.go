@@ -35,18 +35,21 @@ type Networker interface {
 type Network struct {
 	Serial   io.ReadWriteCloser
 	Buffered bool
-	Debug    bool
 
 	// The time to wait for a single read to complete before giving up.
 	Timeout time.Duration
+
+	// Optional log.Logger to log network traffic. If nil (the default), nothing
+	// is logged.
+	Logger *log.Logger
 }
 
 func New(serial io.ReadWriteCloser) *Network {
 	return &Network{
 		Serial:   serial,
 		Buffered: false,
-		Debug:    false,
 		Timeout:  128 * time.Millisecond,
+		Logger:   nil,
 	}
 }
 
@@ -136,7 +139,7 @@ func (network *Network) WriteInstruction(ident uint8, instruction byte, params .
 
 	// write to port
 
-	network.Log(">> %#v\n", buf.Bytes())
+	network.Logf(">> %#v\n", buf.Bytes())
 	_, err := buf.WriteTo(network.Serial)
 
 	if err != nil {
@@ -203,7 +206,7 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 	// and I can't seem to find any useful information on the matter.
 
 	headerBuf, headerErr := network.read(3)
-	network.Log("<< %#v (header, ident)\n", headerBuf)
+	network.Logf("<< %#v (header, ident)\n", headerBuf)
 	if headerErr != nil {
 		return []byte{}, headerErr
 	}
@@ -219,7 +222,7 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 	if resIdent == 255 {
 
 		identBuf, identErr := network.read(1)
-		network.Log("<< %#v (ident retry)\n", identBuf)
+		network.Logf("<< %#v (ident retry)\n", identBuf)
 		if identErr != nil {
 			return []byte{}, identErr
 		}
@@ -230,7 +233,7 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 	// The next two bytes are always present, so just read them.
 
 	paramCountAndErrBitsBuf, pcebErr := network.read(2)
-	network.Log("<< %#v (p+2, errbits)\n", paramCountAndErrBitsBuf)
+	network.Logf("<< %#v (p+2, errbits)\n", paramCountAndErrBitsBuf)
 	if pcebErr != nil {
 		return []byte{}, pcebErr
 	}
@@ -245,7 +248,7 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 	if numParams > 0 {
 		var paramsErr error
 		paramsBuf, paramsErr = network.read(int(numParams))
-		network.Log("<< %#v (params)\n", paramsBuf)
+		network.Logf("<< %#v (params)\n", paramsBuf)
 		if paramsErr != nil {
 			return []byte{}, paramsErr
 		}
@@ -256,7 +259,7 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 
 	checksumBuf, checksumErr := network.read(1)
 
-	network.Log("<< %#v (checksum)\n", checksumBuf)
+	network.Logf("<< %#v (checksum)\n", checksumBuf)
 	if checksumErr != nil {
 		return []byte{}, checksumErr
 	}
@@ -283,7 +286,7 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 // Ping sends the PING instruction to the given Servo ID, and waits for the
 // response. Returns an error if the ping fails, or nil if it succeeds.
 func (n *Network) Ping(ident uint8) error {
-	n.Log("Ping(%d)", ident)
+	n.Logf("Ping(%d)", ident)
 
 	writeErr := n.WriteInstruction(ident, Ping)
 	if writeErr != nil {
@@ -349,8 +352,9 @@ func (n *Network) Action() error {
 	return n.WriteInstruction(BroadcastIdent, Action)
 }
 
-func (n *Network) Log(format string, v ...interface{}) {
-	if n.Debug {
-		log.Printf(format, v...)
+// Logf writes a message to the network logger, unless it's nil.
+func (n *Network) Logf(format string, v ...interface{}) {
+	if n.Logger != nil {
+		n.Logger.Printf(format, v)
 	}
 }
