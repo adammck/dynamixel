@@ -46,7 +46,7 @@ func New(serial io.ReadWriteCloser) *Network {
 		Serial:   serial,
 		Buffered: false,
 		Debug:    false,
-		Timeout:  100 * time.Millisecond,
+		Timeout:  128 * time.Millisecond,
 	}
 }
 
@@ -153,6 +153,7 @@ func (network *Network) WriteInstruction(ident uint8, instruction byte, params .
 func (network *Network) read(n int) ([]byte, error) {
 	start := time.Now()
 	buf := make([]byte, n)
+	retry := 1 * time.Millisecond
 	m := 0
 
 	for m < n {
@@ -165,8 +166,16 @@ func (network *Network) read(n int) ([]byte, error) {
 			return buf, err
 		}
 
+		// If the timeout has been exceeded, abort.
 		if time.Since(start) >= network.Timeout {
 			return buf, fmt.Errorf("read timed out")
+		}
+
+		// If no bytes were read, back off exponentially. This is just to avoid
+		// flooding the network with retries if a servo isn't responding.
+		if n == 0 {
+			time.Sleep(retry)
+			retry *= 2
 		}
 	}
 
