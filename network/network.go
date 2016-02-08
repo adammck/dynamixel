@@ -157,8 +157,8 @@ func (network *Network) read(n int) ([]byte, error) {
 	m := 0
 
 	for m < n {
-		n, err := network.Serial.Read(buf[m:])
-		m += n
+		nn, err := network.Serial.Read(buf[m:])
+		m += nn
 
 		// It's okay if we reached the end of the available bytes. They're probably
 		// just not available yet. Other errors are fatal.
@@ -173,7 +173,7 @@ func (network *Network) read(n int) ([]byte, error) {
 
 		// If no bytes were read, back off exponentially. This is just to avoid
 		// flooding the network with retries if a servo isn't responding.
-		if n == 0 {
+		if nn == 0 {
 			time.Sleep(retry)
 			retry *= 2
 		}
