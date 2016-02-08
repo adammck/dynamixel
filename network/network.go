@@ -33,8 +33,7 @@ type Networker interface {
 }
 
 type Network struct {
-	Serial   io.ReadWriteCloser
-	Buffered bool
+	Serial io.ReadWriteCloser
 
 	// The time to wait for a single read to complete before giving up.
 	Timeout time.Duration
@@ -42,14 +41,17 @@ type Network struct {
 	// Optional log.Logger to log network traffic. If nil (the default), nothing
 	// is logged.
 	Logger *log.Logger
+
+	// Whether the network is currently in bufferred write mode.
+	buffered bool
 }
 
 func New(serial io.ReadWriteCloser) *Network {
 	return &Network{
 		Serial:   serial,
-		Buffered: false,
 		Timeout:  128 * time.Millisecond,
 		Logger:   nil,
+		buffered: false,
 	}
 }
 
@@ -60,7 +62,7 @@ func New(serial io.ReadWriteCloser) *Network {
 //
 // This is very useful for synchronizing the movements of multiple servos.
 func (n *Network) SetBuffered(buffered bool) {
-	n.Buffered = buffered
+	n.buffered = buffered
 }
 
 // DecodeStartusError Converts an error byte (as included in a status packet)
@@ -324,7 +326,7 @@ func (network *Network) ReadData(ident uint8, addr byte, n int) ([]byte, error) 
 func (n *Network) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {
 	var instruction byte
 
-	if n.Buffered {
+	if n.buffered {
 		instruction = RegWrite
 	} else {
 		instruction = WriteData
