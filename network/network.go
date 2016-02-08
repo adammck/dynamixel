@@ -165,8 +165,8 @@ func (network *Network) read(n int) ([]byte, error) {
 		nn, err := network.Serial.Read(buf[m:])
 		m += nn
 
-		// It's okay if we reached the end of the available bytes. They're probably
-		// just not available yet. Other errors are fatal.
+		// It's okay if we reached the end of the available bytes. They're
+		// probably just not available yet. Other errors are fatal.
 		if err != nil && err != io.EOF {
 			return buf, err
 		}
@@ -202,10 +202,10 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 	// parameters.
 	//
 
-	// Read the first three bytes, which are always present. Hopefully, the first
-	// two are the header, and the third is the ID of the servo which this packet
-	// refers to. But sometimes, the third byte is another 0xFF. I don't know why,
-	// and I can't seem to find any useful information on the matter.
+	// Read the first three bytes, which are always present. Hopefully, the
+	// first two are the header, and the third is the ID of the servo which this
+	// packet refers to. But sometimes, the third byte is another 0xFF. I don't
+	// know why, and I can't seem to find any useful information on the matter.
 
 	headerBuf, headerErr := network.read(3)
 	network.Logf("<< %#v (header, ident)\n", headerBuf)
@@ -244,8 +244,8 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 	errBits := paramCountAndErrBitsBuf[1]
 	paramsBuf := make([]byte, numParams)
 
-	// now read the params, if there are any. we must do this before checking for
-	// errors, to avoid leaving junk in the buffer.
+	// now read the params, if there are any. we must do this before checking
+	// for errors, to avoid leaving junk in the buffer.
 
 	if numParams > 0 {
 		var paramsErr error
@@ -267,7 +267,6 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 	}
 
 	// return an error if the packet contained one.
-	// TODO: decode the error bit(s) and return a proper message!
 
 	if errBits != 0x0 {
 		return []byte{}, DecodeStatusError(errBits)
