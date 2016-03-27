@@ -1,7 +1,6 @@
 package servo
 
 import (
-	"errors"
 	"fmt"
 
 	reg "github.com/adammck/dynamixel/registers"
@@ -9,8 +8,6 @@ import (
 )
 
 // These methods are getters for the various registers in the control table.
-// Some of them (where register.cacheable == true) just read from the cache,
-// while others read the actual control table every time.
 //
 // TODO: Each of the following registers should have a corresponding reader, and
 //       the R/W registers (marked with an asterisk) should have a writer. They
@@ -310,18 +307,5 @@ func (s *Servo) Lock() (int, error) {
 }
 
 func (s *Servo) SetLock(isLocked int) error {
-	r := s.registers[reg.Lock]
-
-	// Can't unlock when servo is locked, so if we know that's the case, don't
-	// bother trying. Can be overriden by clearing the cache.
-	//
-	// TODO: Add a method to read ints from the cache. If we used getRegister,
-	//       we risk accidentally (in the case of a bug) reading from the actual
-	//       device, which would be slow and weird.
-
-	if isLocked == 0 && s.cache[r.Address] == byte(1) {
-		return errors.New("EEPROM can't be unlocked; must be power-cycled")
-	}
-
 	return s.setRegister(reg.Lock, isLocked)
 }
