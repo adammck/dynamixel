@@ -59,25 +59,16 @@ func (servo *Servo) getRegister(n reg.RegName) (int, error) {
 	// 	return 0, errors.New("can't READ while Status Return Level is zero")
 	// }
 
-	// Read the single value from the control table.
-
 	b, err := servo.Network.ReadData(uint8(servo.ID), r.Address, r.Length)
 	if err != nil {
 		return 0, err
 	}
 
-	// TODO: Use bytesToInt?
-	switch len(b) {
-	case 1:
-		return int(b[0]), nil
-
-	case 2:
-		return int(b[0]) | int(b[1])<<8, nil
-
-	default:
+	if len(b) != r.Length {
 		return 0, fmt.Errorf("expected %d bytes, got %d", r.Length, len(b))
-
 	}
+
+	return utils.BytesToInt(b)
 }
 
 // setRegister writes a value to the given register. Returns an error if the

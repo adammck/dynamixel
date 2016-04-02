@@ -23,7 +23,7 @@ func TestBytesToInt(t *testing.T) {
 	}
 
 	for _, eg := range examples {
-		act, err := bytesToInt(eg.input)
+		act, err := BytesToInt(eg.input)
 		assert.Equal(t, act, eg.output)
 
 		if eg.err {

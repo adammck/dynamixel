@@ -7,45 +7,51 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetRegister(t *testing.T) {
-	invalidLength := reg.RegName(1)
-	oneByte := reg.RegName(2)
-	twoByte := reg.RegName(3)
+var (
+	roOneByte     = reg.RegName(1)
+	roTwoByte     = reg.RegName(2)
+	rwOneByte     = reg.RegName(3)
+	rwTwoByte     = reg.RegName(4)
+	invalidLength = reg.RegName(5)
+	unsupported   = reg.RegName(6)
+)
 
+func TestGetRegister(t *testing.T) {
 	m := reg.Map{
-		invalidLength: &reg.Register{Address: 0x00, Length: 3, Max: 1},
-		oneByte:       &reg.Register{Address: 0x01, Length: 1, Max: 1},
-		twoByte:       &reg.Register{Address: 0x02, Length: 2, Max: 1},
+		roOneByte:     &reg.Register{Address: 0x01, Length: 1, Max: 1},
+		roTwoByte:     &reg.Register{Address: 0x02, Length: 2, Max: 1},
+		invalidLength: &reg.Register{Address: 0x03, Length: 3, Max: 1},
 	}
 
 	n, servo := servo(m, map[int]byte{})
 
-	// invalid register length
-	x, err := servo.getRegister(invalidLength)
-	assert.Error(t, err)
-	assert.Equal(t, 0, x)
-
 	// read one byte
-	n.controlTable[m[oneByte].Address] = 0x10
-	b, err := servo.getRegister(oneByte)
+	n.controlTable[m[roOneByte].Address] = 0x10
+	r, err := servo.getRegister(roOneByte)
 	assert.Nil(t, err)
-	assert.Equal(t, 0x10, b)
+	assert.Equal(t, 0x10, r)
 
 	// read two bytes
-	n.controlTable[m[twoByte].Address] = 0x10
-	n.controlTable[m[twoByte].Address+1] = 0x20
-	c, err := servo.getRegister(twoByte)
+	n.controlTable[m[roTwoByte].Address] = 0x10
+	n.controlTable[m[roTwoByte].Address+1] = 0x20
+	r, err = servo.getRegister(roTwoByte)
 	assert.Nil(t, err)
-	assert.Equal(t, 0x2010, c) // 0x10(L) | 0x20(H)<<8
+	assert.Equal(t, 0x2010, r) // 0x10(L) | 0x20(H)<<8
+
+	// invalid register length
+	r, err = servo.getRegister(invalidLength)
+	assert.Error(t, err)
+	assert.Equal(t, 0, r)
+
+	// unsupported register (not present in control table)
+	r, err = servo.getRegister(unsupported)
+	assert.Error(t, err)
+	assert.Equal(t, 0, r)
 }
 
 func TestSetRegister(t *testing.T) {
-	readOnly := reg.RegName(1)
-	rwOneByte := reg.RegName(2)
-	rwTwoByte := reg.RegName(3)
-
 	m := reg.Map{
-		readOnly:  &reg.Register{Address: 0x00, Length: 1, Access: reg.RO, Min: 0, Max: 1},
+		roOneByte: &reg.Register{Address: 0x00, Length: 1, Access: reg.RO, Min: 0, Max: 1},
 		rwOneByte: &reg.Register{Address: 0x01, Length: 1, Access: reg.RW, Min: 2, Max: 3},
 		rwTwoByte: &reg.Register{Address: 0x02, Length: 2, Access: reg.RW, Min: 0, Max: 2048},
 	}
@@ -53,7 +59,7 @@ func TestSetRegister(t *testing.T) {
 	n, servo := servo(m, map[int]byte{})
 
 	// read-only register can't be set
-	err := servo.setRegister(readOnly, 1)
+	err := servo.setRegister(roOneByte, 1)
 	assert.Equal(t, byte(0), n.controlTable[0])
 	assert.Error(t, err)
 

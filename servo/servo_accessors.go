@@ -161,8 +161,8 @@ func (s *Servo) SetStatusReturnLevel(value int) error {
 
 	// Call Network.WriteData directly, rather than via writeData, because the
 	// return status level will depend upon the new level, rather than the
-	// current level cache. We don't want to update that until we're sure that
-	// the write was successful.
+	// current level. We don't want to update that until we're sure that the write
+	// was successful.
 	err = s.Network.WriteData(uint8(ident), (value == 2), reg.Address, utils.Low(value))
 	if err != nil {
 		return err
