@@ -1,16 +1,11 @@
 package servo
 
 import (
-	"errors"
-	"fmt"
-
 	reg "github.com/adammck/dynamixel/registers"
 	"github.com/adammck/dynamixel/utils"
 )
 
 // These methods are getters for the various registers in the control table.
-// Some of them (where register.cacheable == true) just read from the cache,
-// while others read the actual control table every time.
 //
 // TODO: Each of the following registers should have a corresponding reader, and
 //       the R/W registers (marked with an asterisk) should have a writer. They
@@ -133,45 +128,6 @@ func (s *Servo) MaxTorque() (int, error) {
 
 func (s *Servo) SetMaxTorque(v int) error {
 	return s.setRegister(reg.MaxTorque, v)
-}
-
-func (s *Servo) StatusReturnLevel() (int, error) {
-	return s.getRegister(reg.StatusReturnLevel)
-}
-
-// Sets the status return level. Possible values are:
-//
-// 0 = Only respond to PING commands
-// 1 = Only respond to PING and READ commands
-// 2 = Respond to all commands
-//
-// Servos default to 2, but retain the value so long as they're powered up. This
-// makes it a very good idea to explicitly set the value after connecting, to
-// avoid waiting for status packets which will never arrive.
-//
-// See: dxl_ax_actuator.htm#Actuator_Address_10
-func (s *Servo) SetStatusReturnLevel(value int) error {
-	reg := s.registers[reg.StatusReturnLevel]
-
-	if value < reg.Min || value > reg.Max {
-		return fmt.Errorf("invalid Status Return Level value: %d", value)
-	}
-
-	ident, err := s.ServoID()
-	if err != nil {
-		return err
-	}
-
-	// Call Network.WriteData directly, rather than via writeData, because the
-	// return status level will depend upon the new level, rather than the
-	// current level cache. We don't want to update that until we're sure that
-	// the write was successful.
-	err = s.Network.WriteData(uint8(ident), (value == 2), reg.Address, utils.Low(value))
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 func (s *Servo) AlarmLED() (int, error) {
@@ -310,18 +266,5 @@ func (s *Servo) Lock() (int, error) {
 }
 
 func (s *Servo) SetLock(isLocked int) error {
-	r := s.registers[reg.Lock]
-
-	// Can't unlock when servo is locked, so if we know that's the case, don't
-	// bother trying. Can be overriden by clearing the cache.
-	//
-	// TODO: Add a method to read ints from the cache. If we used getRegister,
-	//       we risk accidentally (in the case of a bug) reading from the actual
-	//       device, which would be slow and weird.
-
-	if isLocked == 0 && s.cache[r.Address] == byte(1) {
-		return errors.New("EEPROM can't be unlocked; must be power-cycled")
-	}
-
 	return s.setRegister(reg.Lock, isLocked)
 }

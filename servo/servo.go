@@ -1,6 +1,7 @@
 package servo
 
 import (
+	"errors"
 	"fmt"
 	"github.com/adammck/dynamixel/network"
 	reg "github.com/adammck/dynamixel/registers"
@@ -8,11 +9,6 @@ import (
 )
 
 const (
-
-	// Control table size (in bytes)
-	// TODO: Instead of hard-coding this, maybe calculate the size by finding
-	//       the highest register address and adding its length?
-	tableSize = 50
 
 	// Unit conversions
 	maxPos          uint16  = 1023
@@ -25,56 +21,85 @@ type Servo struct {
 	Network network.Networker
 	ID      int
 
+	returnLevelValue int
+	returnLevelKnown bool
+
 	// The map of register names to locations in the control table. This
 	// (unfortunately) varies between models, so can't be const.
 	registers reg.Map
 
 	// TODO: Remove this!
 	zeroAngle float64
-
-	// Cache of control table values.
-	cache [tableSize]byte
 }
 
-// New returns a new Servo with its cache populated.
-// TODO: Return a pointer, error tuple! We're currently ignoring the return
-//       value of the populateCache call.
-func New(network network.Networker, ID int, registers reg.Map) *Servo {
-	s := &Servo{
+// New returns a new Servo.
+func New(network network.Networker, registers reg.Map, ID int) *Servo {
+	return &Servo{
 		Network:   network,
 		ID:        ID,
 		registers: registers,
 		zeroAngle: 150,
 	}
+}
 
-	_ = s.populateCache()
+// NewWithReturnLevel returns a servo with its Return Level preconfigured. It's
+// better to use New and SetReturnLevel to be sure, but this can be useful when
+// we're absolutely sure what the return level currently is.
+func NewWithReturnLevel(network network.Networker, registers reg.Map, ID int, returnLevel int) *Servo {
+	s := New(network, registers, ID)
+	s.returnLevelValue = returnLevel
+	s.returnLevelKnown = true
 	return s
 }
 
-// populateCache reads the entire control table from the servo, and stores it in
-// the cache.
-func (servo *Servo) populateCache() error {
-	b, err := servo.Network.ReadData(uint8(servo.ID), 0x0, tableSize)
+// SetReturnLevel sets the return level. Possible values are:
+//
+//   0 = Only respond to PING commands
+//   1 = Only respond to PING and READ commands
+//   2 = Respond to all commands
+//
+// The factory default setting is 2, but this register is persisted in EEPROM,
+// so does not reset when power-cycled. To avoid waiting for a response from a
+// servo which will never respond, or (worse) receiving unexpected responses,
+// use this method to set the value explicitly immediately after connecting.
+//
+// See: dxl_ax_actuator.htm#Actuator_Address_10
+func (s *Servo) SetReturnLevel(value int) error {
+	reg := s.registers[reg.StatusReturnLevel]
+
+	if value < reg.Min || value > reg.Max {
+		return fmt.Errorf("invalid Status Return Level value: %d", value)
+	}
+
+	ident, err := s.ServoID()
 	if err != nil {
 		return err
 	}
 
-	// Ensure that the returned slice is the right size.
-	if len(b) != tableSize {
-		return fmt.Errorf("invalid control table size: %d (expected %d)", len(b), tableSize)
-	}
-
-	// Copy each byte to the cache.
-	// TODO: Surely there is a better way to do this.
-	for i := 0; i < tableSize; i++ {
-		servo.cache[i] = b[i]
+	// Call Network.WriteData directly, rather than via writeData, because the
+	// return status level will depend upon the new level, rather than the
+	// current level. We don't want to update that until we're sure that the write
+	// was successful.
+	err = s.Network.WriteData(uint8(ident), (value == 2), reg.Address, utils.Low(value))
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-// getRegister fetches the value of a register from the cache if possible,
-// otherwise reads it from the control table (and caches it).
+// ReturnLevel returns the current return level of the servo, or an error if we
+// don't know. This method will never actually read from the control table,
+// because it's expected to be called by getters are setters.
+func (servo *Servo) ReturnLevel() (int, error) {
+	if !servo.returnLevelKnown {
+		return 0, errors.New("current Return Level is unknown")
+	}
+
+	return servo.returnLevelValue, nil
+}
+
+// getRegister fetches the value of a register from the control table.
 func (servo *Servo) getRegister(n reg.RegName) (int, error) {
 	r, ok := servo.registers[n]
 	if !ok {
@@ -85,50 +110,24 @@ func (servo *Servo) getRegister(n reg.RegName) (int, error) {
 		return 0, fmt.Errorf("invalid register length: %d", r.Length)
 	}
 
-	// If the register is cacheable, read the value from the cache and return
-	// that. The populateCache method must have been called first.
-
-	if r.Cacheable {
-		v := int(servo.cache[r.Address])
-
-		if r.Length == 2 {
-			v |= int(servo.cache[r.Address+1]) << 8
-		}
-
-		return v, nil
+	rl, err := servo.ReturnLevel()
+	if err != nil {
+		return 0, err
 	}
-
-	// Abort if return level is zero.
-
-	// rl, err := servo.StatusReturnLevel()
-	// if err != nil {
-	// 	return 0, err
-	// }
-	// if rl == 0 {
-	// 	return 0, errors.New("can't READ while Status Return Level is zero")
-	// }
-
-	// Read the single value from the control table.
+	if rl == 0 {
+		return 0, errors.New("can't READ while Return Level is zero")
+	}
 
 	b, err := servo.Network.ReadData(uint8(servo.ID), r.Address, r.Length)
 	if err != nil {
 		return 0, err
 	}
 
-	switch len(b) {
-	case 1:
-		servo.cache[r.Address] = b[0]
-		return int(b[0]), nil
-
-	case 2:
-		servo.cache[r.Address] = b[0]
-		servo.cache[r.Address+1] = b[1]
-		return int(b[0]) | int(b[1])<<8, nil
-
-	default:
+	if len(b) != r.Length {
 		return 0, fmt.Errorf("expected %d bytes, got %d", r.Length, len(b))
-
 	}
+
+	return utils.BytesToInt(b)
 }
 
 // setRegister writes a value to the given register. Returns an error if the
@@ -151,7 +150,9 @@ func (servo *Servo) setRegister(n reg.RegName, value int) error {
 		return fmt.Errorf("value too high: %d (max=%d)", value, r.Max)
 	}
 
-	rl, err := servo.StatusReturnLevel()
+	// Refuse to write if we don't know the return level, because we can't know
+	// whether to wait for a status packet or not.
+	rl, err := servo.ReturnLevel()
 	if err != nil {
 		return err
 	}
@@ -160,12 +161,9 @@ func (servo *Servo) setRegister(n reg.RegName, value int) error {
 	switch r.Length {
 	case 1:
 		servo.Network.WriteData(uint8(servo.ID), (rl == 2), r.Address, utils.Low(value))
-		servo.cache[r.Address] = utils.Low(value)
 
 	case 2:
 		servo.Network.WriteData(uint8(servo.ID), (rl == 2), r.Address, utils.Low(value), utils.High(value))
-		servo.cache[r.Address] = utils.Low(value)
-		servo.cache[r.Address+1] = utils.High(value)
 
 	default:
 		return fmt.Errorf("invalid register length: %d", r.Length)

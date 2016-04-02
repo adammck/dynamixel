@@ -4,9 +4,9 @@ import (
 	"fmt"
 )
 
-// bytesToInt converts a slice of bytes to an int. Only 8- and 16-bit uints are
+// BytesToInt converts a slice of bytes to an int. Only 8- and 16-bit uints are
 // supported, because those are the only thing the control tables contain.
-func bytesToInt(b []byte) (int, error) {
+func BytesToInt(b []byte) (int, error) {
 
 	switch len(b) {
 	case 1:

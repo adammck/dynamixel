@@ -6,10 +6,9 @@ type Access int
 type Map map[RegName]*Register
 
 type Register struct {
-	Address   byte
-	Length    int
-	Access    Access
-	Cacheable bool
+	Address byte
+	Length  int
+	Access  Access
 
 	// The range of values which this register can be set to. This only applies
 	// is the register is RW.
@@ -56,7 +55,7 @@ const (
 
 	// Access Levels specify whether a register is hard-coded into the servo
 	// (e.g. the model number), or is a value which can be changed (e.g. the
-	// identity).
-	RO Access = iota
-	RW
+	// identity). The zero-value is RO.
+	RO Access = 0
+	RW Access = 1
 )
