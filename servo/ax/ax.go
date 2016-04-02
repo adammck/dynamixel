@@ -9,7 +9,7 @@ import (
 // New returns a new AX-series servo with the given ID.
 // See: http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm
 func New(n network.Networker, ID int) (*servo.Servo, error) {
-	return servo.New(n, ID, Registers), nil
+	return servo.New(n, Registers, ID), nil
 }
 
 var Registers reg.Map

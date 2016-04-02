@@ -145,7 +145,7 @@ func servo(r reg.Map, b map[int]byte) (*mockNetwork, *Servo) {
 		n.controlTable[addr] = val
 	}
 
-	s := New(n, 1, m)
+	s := NewWithReturnLevel(n, m, 1, 2)
 	return n, s
 }
 
