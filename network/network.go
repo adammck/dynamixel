@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"log"
 	"strings"
 	"time"
 )
@@ -24,6 +23,11 @@ const (
 	BroadcastIdent byte = 0xFE // 254
 )
 
+// TODO: Use an io.writer instead?
+type Logger interface {
+	Printf(format string, v ...interface{})
+}
+
 // Networker provides an interface to the underlying servos' control tables by
 // reading and writing to/from the network interface.
 type Networker interface {
@@ -38,9 +42,9 @@ type Network struct {
 	// The time to wait for a single read to complete before giving up.
 	Timeout time.Duration
 
-	// Optional log.Logger to log network traffic. If nil (the default), nothing
-	// is logged.
-	Logger *log.Logger
+	// Optional Logger (which only implements Printf) to log network traffic. If
+	// nil (the default), nothing is logged.
+	Logger Logger
 
 	// Whether the network is currently in bufferred write mode.
 	buffered bool
