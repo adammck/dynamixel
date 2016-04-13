@@ -71,19 +71,18 @@ func (s *Servo) SetReturnLevel(value int) error {
 		return fmt.Errorf("invalid Status Return Level value: %d", value)
 	}
 
-	ident, err := s.ServoID()
-	if err != nil {
-		return err
-	}
-
 	// Call Network.WriteData directly, rather than via writeData, because the
 	// return status level will depend upon the new level, rather than the
 	// current level. We don't want to update that until we're sure that the write
 	// was successful.
-	err = s.Network.WriteData(uint8(ident), (value == 2), reg.Address, utils.Low(value))
+	err := s.Network.WriteData(uint8(s.ID), (value == 2), reg.Address, utils.Low(value))
 	if err != nil {
 		return err
 	}
+
+	// Update the cache.
+	s.returnLevelKnown = true
+	s.returnLevelValue = value
 
 	return nil
 }
