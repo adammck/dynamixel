@@ -3,7 +3,8 @@ package servo
 import (
 	"errors"
 	"fmt"
-	"github.com/adammck/dynamixel/network"
+
+	"github.com/adammck/dynamixel/iface"
 	reg "github.com/adammck/dynamixel/registers"
 	"github.com/adammck/dynamixel/utils"
 )
@@ -18,7 +19,7 @@ const (
 )
 
 type Servo struct {
-	Network network.Networker
+	Network iface.Networker
 	ID      int
 
 	returnLevelValue int
@@ -33,7 +34,7 @@ type Servo struct {
 }
 
 // New returns a new Servo.
-func New(network network.Networker, registers reg.Map, ID int) *Servo {
+func New(network iface.Networker, registers reg.Map, ID int) *Servo {
 	return &Servo{
 		Network:   network,
 		ID:        ID,
@@ -45,7 +46,7 @@ func New(network network.Networker, registers reg.Map, ID int) *Servo {
 // NewWithReturnLevel returns a servo with its Return Level preconfigured. It's
 // better to use New and SetReturnLevel to be sure, but this can be useful when
 // we're absolutely sure what the return level currently is.
-func NewWithReturnLevel(network network.Networker, registers reg.Map, ID int, returnLevel int) *Servo {
+func NewWithReturnLevel(network iface.Networker, registers reg.Map, ID int, returnLevel int) *Servo {
 	s := New(network, registers, ID)
 	s.returnLevelValue = returnLevel
 	s.returnLevelKnown = true

@@ -6,6 +6,8 @@ import (
 	"io"
 	"strings"
 	"time"
+
+	"github.com/adammck/dynamixel/iface"
 )
 
 const (
@@ -23,19 +25,6 @@ const (
 	BroadcastIdent byte = 0xFE // 254
 )
 
-// TODO: Use an io.writer instead?
-type Logger interface {
-	Printf(format string, v ...interface{})
-}
-
-// Networker provides an interface to the underlying servos' control tables by
-// reading and writing to/from the network interface.
-type Networker interface {
-	Ping(uint8) error
-	ReadData(uint8, byte, int) ([]byte, error)
-	WriteData(uint8, bool, ...byte) error
-}
-
 type Network struct {
 	Serial io.ReadWriteCloser
 
@@ -44,7 +33,7 @@ type Network struct {
 
 	// Optional Logger (which only implements Printf) to log network traffic. If
 	// nil (the default), nothing is logged.
-	Logger Logger
+	Logger iface.Logger
 
 	// Whether the network is currently in bufferred write mode.
 	buffered bool
