@@ -1,4 +1,4 @@
-package network
+package v1
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/adammck/dynamixel/iface"
+	"github.com/adammck/dynamixel/utils"
 )
 
 const (
@@ -58,6 +59,10 @@ func (n *Network) SetBuffered(buffered bool) {
 	n.buffered = buffered
 }
 
+func (n *Network) SetLogger(logger iface.Logger) {
+	n.Logger = logger
+}
+
 // DecodeStartusError Converts an error byte (as included in a status packet)
 // into an error object with a friendly error message. We can't be too specific
 // about it, because any combination of errors might occur at the same time.
@@ -106,7 +111,7 @@ func DecodeStatusError(errBits byte) error {
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_instruction.htm
 
-func (network *Network) WriteInstruction(ident uint8, instruction byte, params ...byte) error {
+func (n *Network) WriteInstruction(ident byte, instruction byte, params ...byte) error {
 	buf := new(bytes.Buffer)
 	paramsLength := byte(len(params) + 2)
 
@@ -124,7 +129,7 @@ func (network *Network) WriteInstruction(ident uint8, instruction byte, params .
 
 	// calculate checksum
 
-	sum := ident + paramsLength + instruction
+	sum := byte(ident) + paramsLength + instruction
 
 	for _, value := range params {
 		sum += value
@@ -134,8 +139,8 @@ func (network *Network) WriteInstruction(ident uint8, instruction byte, params .
 
 	// write to port
 
-	network.Logf(">> %#v\n", buf.Bytes())
-	_, err := buf.WriteTo(network.Serial)
+	n.Logf(">> %#v\n", buf.Bytes())
+	_, err := buf.WriteTo(n.Serial)
 
 	if err != nil {
 		return err
@@ -148,14 +153,14 @@ func (network *Network) WriteInstruction(ident uint8, instruction byte, params .
 // immediately available. Returns a slice containing the bytes read. If the
 // network timeout is reached, returns the bytes read so far (which might be
 // none) and an error.
-func (network *Network) read(n int) ([]byte, error) {
+func (n *Network) read(count int) ([]byte, error) {
 	start := time.Now()
-	buf := make([]byte, n)
+	buf := make([]byte, count)
 	retry := 1 * time.Millisecond
 	m := 0
 
-	for m < n {
-		nn, err := network.Serial.Read(buf[m:])
+	for m < count {
+		nn, err := n.Serial.Read(buf[m:])
 		m += nn
 
 		// It's okay if we reached the end of the available bytes. They're
@@ -165,7 +170,7 @@ func (network *Network) read(n int) ([]byte, error) {
 		}
 
 		// If the timeout has been exceeded, abort.
-		if time.Since(start) >= network.Timeout {
+		if time.Since(start) >= n.Timeout {
 			return buf, fmt.Errorf("read timed out")
 		}
 
@@ -180,7 +185,7 @@ func (network *Network) read(n int) ([]byte, error) {
 	return buf, nil
 }
 
-func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
+func (n *Network) ReadStatusPacket(expectIdent byte) ([]byte, error) {
 
 	//
 	// Status packets are similar to instruction packet:
@@ -200,8 +205,8 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 	// packet refers to. But sometimes, the third byte is another 0xFF. I don't
 	// know why, and I can't seem to find any useful information on the matter.
 
-	headerBuf, headerErr := network.read(3)
-	network.Logf("<< %#v (header, ident)\n", headerBuf)
+	headerBuf, headerErr := n.read(3)
+	n.Logf("<< %#v (header, ident)\n", headerBuf)
 	if headerErr != nil {
 		return []byte{}, headerErr
 	}
@@ -213,22 +218,22 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 	// The third byte should be the ident. But if an extra header byte has shown
 	// up, ignore it and read another byte to replace it.
 
-	resIdent := uint8(headerBuf[2])
+	resIdent := headerBuf[2]
 	if resIdent == 255 {
 
-		identBuf, identErr := network.read(1)
-		network.Logf("<< %#v (ident retry)\n", identBuf)
+		identBuf, identErr := n.read(1)
+		n.Logf("<< %#v (ident retry)\n", identBuf)
 		if identErr != nil {
 			return []byte{}, identErr
 		}
 
-		resIdent = uint8(identBuf[0])
+		resIdent = identBuf[0]
 	}
 
 	// The next two bytes are always present, so just read them.
 
-	paramCountAndErrBitsBuf, pcebErr := network.read(2)
-	network.Logf("<< %#v (p+2, errbits)\n", paramCountAndErrBitsBuf)
+	paramCountAndErrBitsBuf, pcebErr := n.read(2)
+	n.Logf("<< %#v (p+2, errbits)\n", paramCountAndErrBitsBuf)
 	if pcebErr != nil {
 		return []byte{}, pcebErr
 	}
@@ -242,8 +247,8 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 
 	if numParams > 0 {
 		var paramsErr error
-		paramsBuf, paramsErr = network.read(int(numParams))
-		network.Logf("<< %#v (params)\n", paramsBuf)
+		paramsBuf, paramsErr = n.read(int(numParams))
+		n.Logf("<< %#v (params)\n", paramsBuf)
 		if paramsErr != nil {
 			return []byte{}, paramsErr
 		}
@@ -252,9 +257,9 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 	// read the checksum, which is always one byte
 	// TODO: check the checksum
 
-	checksumBuf, checksumErr := network.read(1)
+	checksumBuf, checksumErr := n.read(1)
 
-	network.Logf("<< %#v (checksum)\n", checksumBuf)
+	n.Logf("<< %#v (checksum)\n", checksumBuf)
 	if checksumErr != nil {
 		return []byte{}, checksumErr
 	}
@@ -279,7 +284,7 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 
 // Ping sends the PING instruction to the given Servo ID, and waits for the
 // response. Returns an error if the ping fails, or nil if it succeeds.
-func (n *Network) Ping(ident uint8) error {
+func (n *Network) Ping(ident byte) error {
 	n.Logf("Ping(%d)", ident)
 
 	writeErr := n.WriteInstruction(ident, Ping)
@@ -297,17 +302,23 @@ func (n *Network) Ping(ident uint8) error {
 	return nil
 }
 
-// ReadData reads a slice of n bytes from the control table of the given servo
-// ID. Use the bytesToInt function to convert the output to something more
+// ReadData reads a slice of count bytes from the control table of the given
+// servo ID. Use the bytesToInt function to convert the output to something more
 // useful.
-func (network *Network) ReadData(ident uint8, addr byte, n int) ([]byte, error) {
-	params := []byte{addr, byte(n)}
-	err := network.WriteInstruction(ident, ReadData, params...)
+func (n *Network) ReadData(ident int, addr int, count int) ([]byte, error) {
+	ib := utils.Low(ident)
+
+	params := []byte{
+		utils.Low(addr),
+		byte(count),
+	}
+
+	err := n.WriteInstruction(ib, ReadData, params...)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	buf, err := network.ReadStatusPacket(ident)
+	buf, err := n.ReadStatusPacket(ib)
 	if err != nil {
 		return buf, err
 	}
@@ -315,7 +326,9 @@ func (network *Network) ReadData(ident uint8, addr byte, n int) ([]byte, error) 
 	return buf, nil
 }
 
-func (n *Network) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {
+func (n *Network) WriteData(ident int, address int, data []byte, expectStausPacket bool) error {
+	ib := utils.Low(ident)
+
 	var instruction byte
 
 	if n.buffered {
@@ -324,13 +337,18 @@ func (n *Network) WriteData(ident uint8, expectStausPacket bool, params ...byte)
 		instruction = WriteData
 	}
 
-	writeErr := n.WriteInstruction(ident, instruction, params...)
+	// Params is dest address followed by the data.
+	p := make([]byte, len(data)+1)
+	p[0] = utils.Low(address)
+	copy(p[1:], data)
+
+	writeErr := n.WriteInstruction(ib, instruction, p...)
 	if writeErr != nil {
 		return writeErr
 	}
 
 	if expectStausPacket {
-		_, readErr := n.ReadStatusPacket(ident)
+		_, readErr := n.ReadStatusPacket(ib)
 		if readErr != nil {
 			return readErr
 		}

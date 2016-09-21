@@ -6,9 +6,13 @@ type Access int
 type Map map[RegName]*Register
 
 type Register struct {
+
+	// TODO: Make address a plain int, since proto1 wants a byte, and proto2
+	//       wants a uint16. We have to cast it either way.
 	Address byte
-	Length  int
-	Access  Access
+
+	Length int
+	Access Access
 
 	// The range of values which this register can be set to. This only applies
 	// is the register is RW.
@@ -48,10 +52,18 @@ const (
 	PresentLoad
 	PresentVoltage
 	PresentTemperature
-	Registered
+	RegisteredInstruction
 	Moving
 	Lock
 	Punch
+
+	ControlMode         // XL-320
+	DGain               // XL-320
+	IGain               // XL-320
+	PGain               // XL-320
+	HardwareErrorStatus // XL-320
+	GoalVelocity
+	GoalTorque
 
 	// Access Levels specify whether a register is hard-coded into the servo
 	// (e.g. the model number), or is a value which can be changed (e.g. the

@@ -36,23 +36,23 @@ func init() {
 		reg.AlarmShutdown:           {0x12, 1, reg.RW, 0, 256},  // enum; see docs
 
 		// RAM: Reset to default when power-cycled
-		reg.TorqueEnable:        {0x18, 1, reg.RW, 0, 1},    // bool
-		reg.Led:                 {0x19, 1, reg.RW, 0, 1},    // bool
-		reg.CwComplianceMargin:  {0x1a, 1, reg.RW, 0, 255},  // def=1
-		reg.CcwComplianceMargin: {0x1b, 1, reg.RW, 0, 255},  // def=1
-		reg.CwComplianceSlope:   {0x1c, 1, reg.RW, 0, 254},  // stepped (see docs), def=32
-		reg.CcwComplianceSlope:  {0x1d, 1, reg.RW, 0, 254},  // stepped (see docs), def=32
-		reg.GoalPosition:        {0x1e, 2, reg.RW, 0, 1023}, // deg = value*0.29; 512 (150 deg) is center
-		reg.MovingSpeed:         {0x20, 2, reg.RW, 0, 1023}, // joint mode: rpm = ~value*0.111, but 0 = max rpm. wheel mode: see docs
-		reg.TorqueLimit:         {0x22, 2, reg.RW, 0, 1023}, // zero to max torque
-		reg.PresentPosition:     {0x24, 2, reg.RO, x, x},    // like goalPosition
-		reg.PresentSpeed:        {0x26, 2, reg.RO, x, x},
-		reg.PresentLoad:         {0x28, 2, reg.RO, x, x},
-		reg.PresentVoltage:      {0x2a, 1, reg.RO, x, x},
-		reg.PresentTemperature:  {0x2b, 1, reg.RO, x, x},
-		reg.Registered:          {0x2c, 1, reg.RO, x, x},
-		reg.Moving:              {0x2e, 1, reg.RO, x, x},
-		reg.Lock:                {0x2f, 1, reg.RW, 0, 1}, // bool
-		reg.Punch:               {0x30, 2, reg.RW, 32, 1023},
+		reg.TorqueEnable:          {0x18, 1, reg.RW, 0, 1},    // bool
+		reg.Led:                   {0x19, 1, reg.RW, 0, 1},    // bool
+		reg.CwComplianceMargin:    {0x1a, 1, reg.RW, 0, 255},  // def=1
+		reg.CcwComplianceMargin:   {0x1b, 1, reg.RW, 0, 255},  // def=1
+		reg.CwComplianceSlope:     {0x1c, 1, reg.RW, 0, 254},  // stepped (see docs), def=32
+		reg.CcwComplianceSlope:    {0x1d, 1, reg.RW, 0, 254},  // stepped (see docs), def=32
+		reg.GoalPosition:          {0x1e, 2, reg.RW, 0, 1023}, // deg = value*0.29; 512 (150 deg) is center
+		reg.MovingSpeed:           {0x20, 2, reg.RW, 0, 1023}, // joint mode: rpm = ~value*0.111, but 0 = max rpm. wheel mode: see docs
+		reg.TorqueLimit:           {0x22, 2, reg.RW, 0, 1023}, // zero to max torque
+		reg.PresentPosition:       {0x24, 2, reg.RO, x, x},    // like goalPosition
+		reg.PresentSpeed:          {0x26, 2, reg.RO, x, x},
+		reg.PresentLoad:           {0x28, 2, reg.RO, x, x},
+		reg.PresentVoltage:        {0x2a, 1, reg.RO, x, x},
+		reg.PresentTemperature:    {0x2b, 1, reg.RO, x, x},
+		reg.RegisteredInstruction: {0x2c, 1, reg.RO, x, x},
+		reg.Moving:                {0x2e, 1, reg.RO, x, x},
+		reg.Lock:                  {0x2f, 1, reg.RW, 0, 1}, // bool
+		reg.Punch:                 {0x30, 2, reg.RW, 32, 1023},
 	}
 }

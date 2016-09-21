@@ -13,7 +13,7 @@ package main
 import (
   "log"
   "github.com/jacobsa/go-serial/serial"
-  "github.com/adammck/dynamixel/network"
+  network "github.com/adammck/dynamixel/protocol/v1"
   "github.com/adammck/dynamixel/servo/ax"
 )
 

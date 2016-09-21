@@ -76,7 +76,7 @@ func (s *Servo) SetReturnLevel(value int) error {
 	// return status level will depend upon the new level, rather than the
 	// current level. We don't want to update that until we're sure that the write
 	// was successful.
-	err := s.Network.WriteData(uint8(s.ID), (value == 2), reg.Address, utils.Low(value))
+	err := s.Network.WriteData(s.ID, int(reg.Address), []byte{utils.Low(value)}, (value == 2))
 	if err != nil {
 		return err
 	}
@@ -92,11 +92,46 @@ func (s *Servo) SetReturnLevel(value int) error {
 // don't know. This method will never actually read from the control table,
 // because it's expected to be called by getters are setters.
 func (servo *Servo) ReturnLevel() (int, error) {
+
+	// We don't know what the return level is, so take a moment to figure it
+	// out. This is unfortunate, but much better than guessing.
 	if !servo.returnLevelKnown {
-		return 0, errors.New("current Return Level is unknown")
+		err := servo.FetchReturnLevel()
+		if err != nil {
+			return 0, err
+		}
 	}
 
 	return servo.returnLevelValue, nil
+}
+
+func (s *Servo) FetchReturnLevel() error {
+
+	// Try to read the Return Level from the EEPROM. This will succeed if it's
+	// one (return only for READ commands), or two (return for all commands).
+
+	r := s.registers[reg.StatusReturnLevel]
+	b, err := s.Network.ReadData(s.ID, int(r.Address), r.Length)
+	if err == nil {
+		s.returnLevelKnown = true
+		s.returnLevelValue = int(b[0])
+		return nil
+	}
+
+	// We couldn't read the Return Level. This could mean that the servo isn't
+	// responding at all, or it could mean that the return level is set to zero.
+	// Ping it to find out.
+
+	err = s.Ping()
+	if err == nil {
+		s.returnLevelKnown = true
+		s.returnLevelValue = 0
+		return nil
+	}
+
+	s.returnLevelKnown = false
+	s.returnLevelValue = 0
+	return fmt.Errorf("can't fetch Return Level")
 }
 
 // getRegister fetches the value of a register from the control table.
@@ -118,7 +153,7 @@ func (servo *Servo) getRegister(n reg.RegName) (int, error) {
 		return 0, errors.New("can't READ while Return Level is zero")
 	}
 
-	b, err := servo.Network.ReadData(uint8(servo.ID), r.Address, r.Length)
+	b, err := servo.Network.ReadData(servo.ID, int(r.Address), r.Length)
 	if err != nil {
 		return 0, err
 	}
@@ -160,16 +195,16 @@ func (servo *Servo) setRegister(n reg.RegName, value int) error {
 	// TODO: Add log message when setting a register.
 	switch r.Length {
 	case 1:
-		servo.Network.WriteData(uint8(servo.ID), (rl == 2), r.Address, utils.Low(value))
+		err = servo.Network.WriteData(servo.ID, int(r.Address), []byte{utils.Low(value)}, (rl == 2))
 
 	case 2:
-		servo.Network.WriteData(uint8(servo.ID), (rl == 2), r.Address, utils.Low(value), utils.High(value))
+		err = servo.Network.WriteData(servo.ID, int(r.Address), []byte{utils.Low(value), utils.High(value)}, (rl == 2))
 
 	default:
-		return fmt.Errorf("invalid register length: %d", r.Length)
+		err = fmt.Errorf("invalid register length: %d", r.Length)
 	}
 
-	return nil
+	return err
 }
 
 // Ping sends the PING instruction to servo, and waits for the response. Returns
