@@ -42,7 +42,7 @@ import (
 // presentLoad
 // presentVoltage
 // presentTemperature
-// registered
+// registeredInstruction (a.k.a. registered)
 // moving
 // lock*
 // punch*
@@ -252,8 +252,8 @@ func (s *Servo) PresentTemperature() (int, error) {
 	return s.getRegister(reg.PresentTemperature)
 }
 
-func (s *Servo) Registered() (int, error) {
-	return s.getRegister(reg.Registered)
+func (s *Servo) RegisteredInstruction() (int, error) {
+	return s.getRegister(reg.RegisteredInstruction)
 }
 
 func (s *Servo) Moving() (int, error) {

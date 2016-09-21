@@ -3,16 +3,20 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/adammck/dynamixel/network"
-	"github.com/adammck/dynamixel/servo/ax"
-	"github.com/jacobsa/go-serial/serial"
 	"log"
 	"os"
+
+	"github.com/adammck/dynamixel/network"
+	"github.com/adammck/dynamixel/servo"
+	"github.com/adammck/dynamixel/servo/ax"
+	"github.com/adammck/dynamixel/servo/xl"
+	"github.com/jacobsa/go-serial/serial"
 )
 
 var (
 	portName = flag.String("port", "/dev/tty.usbserial-A9ITPZVR", "the serial port path")
-	servoId  = flag.Int("id", 1, "the ID of the servo to move")
+	servoID  = flag.Int("id", 1, "the ID of the servo to move")
+	model    = flag.String("model", "ax", "the model of the servo to move")
 	position = flag.Int("position", 512, "the goal position to set")
 	debug    = flag.Bool("debug", false, "show serial traffic")
 )
@@ -40,7 +44,20 @@ func main() {
 		network.Logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
-	servo, err := ax.New(network, *servoId)
+	network.Flush()
+
+	var servo *servo.Servo
+	switch *model {
+	case "ax":
+		servo, err = ax.New(network, *servoID)
+
+	case "xl":
+		servo, err = xl.New(network, *servoID)
+
+	default:
+		fmt.Printf("unsupported servo model: %s\n", *model)
+	}
+
 	if err != nil {
 		fmt.Printf("servo init error: %s\n", err)
 		os.Exit(1)

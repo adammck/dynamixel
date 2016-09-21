@@ -3,17 +3,21 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/adammck/dynamixel/network"
-	"github.com/adammck/dynamixel/servo/ax"
-	"github.com/jacobsa/go-serial/serial"
 	"log"
 	"os"
 	"time"
+
+	"github.com/adammck/dynamixel/network"
+	"github.com/adammck/dynamixel/servo"
+	"github.com/adammck/dynamixel/servo/ax"
+	"github.com/adammck/dynamixel/servo/xl"
+	"github.com/jacobsa/go-serial/serial"
 )
 
 var (
 	portName = flag.String("port", "/dev/tty.usbserial-A9ITPZVR", "the serial port path")
-	servoId  = flag.Int("id", 1, "the ID of the servo to flash")
+	servoID  = flag.Int("id", 1, "the ID of the servo to flash")
+	model    = flag.String("model", "ax", "the model of the servo to flash")
 	interval = flag.Int("interval", 200, "the time between flashes (ms)")
 	debug    = flag.Bool("debug", false, "show serial traffic")
 )
@@ -41,7 +45,20 @@ func main() {
 		network.Logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
-	servo, err := ax.New(network, *servoId)
+	network.Flush()
+
+	var servo *servo.Servo
+	switch *model {
+	case "ax":
+		servo, err = ax.New(network, *servoID)
+
+	case "xl":
+		servo, err = xl.New(network, *servoID)
+
+	default:
+		fmt.Printf("unsupported servo model: %s\n", *model)
+	}
+
 	if err != nil {
 		fmt.Printf("servo init error: %s\n", err)
 		os.Exit(1)
@@ -53,10 +70,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	led := false
+	led := true
 	for {
-		led = !led
-		servo.SetLED(led)
+		err = servo.SetLED(led)
+		if err != nil {
+			fmt.Printf("SetLED error: %s\n", err)
+			os.Exit(1)
+		}
+
 		time.Sleep(time.Duration(*interval) * time.Millisecond)
+		led = !led
 	}
 }
