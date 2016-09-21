@@ -8,11 +8,11 @@ import (
 
 // New returns a new XL-320 servo with the given ID.
 // See: http://support.robotis.com/en/product/dynamixel/xl-series/xl-320.htm
-func New(n iface.Networker, ID int) (*servo.Servo, error) {
+func New(n iface.Protocol, ID int) (*servo.Servo, error) {
 	return servo.New(n, Registers, ID), nil
 }
 
-func NewWithReturnLevel(n iface.Networker, ID int, returnLevel int) (*servo.Servo, error) {
+func NewWithReturnLevel(n iface.Protocol, ID int, returnLevel int) (*servo.Servo, error) {
 	return servo.NewWithReturnLevel(n, Registers, ID, returnLevel), nil
 }
 

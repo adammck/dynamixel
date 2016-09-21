@@ -8,7 +8,7 @@ import (
 
 // New returns a new AX-series servo with the given ID.
 // See: http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm
-func New(n iface.Networker, ID int) (*servo.Servo, error) {
+func New(n iface.Protocol, ID int) (*servo.Servo, error) {
 	return servo.New(n, Registers, ID), nil
 }
 

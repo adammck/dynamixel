@@ -19,8 +19,8 @@ const (
 )
 
 type Servo struct {
-	Network iface.Networker
-	ID      int
+	Protocol iface.Protocol
+	ID       int
 
 	returnLevelValue int
 	returnLevelKnown bool
@@ -34,9 +34,9 @@ type Servo struct {
 }
 
 // New returns a new Servo.
-func New(network iface.Networker, registers reg.Map, ID int) *Servo {
+func New(proto iface.Protocol, registers reg.Map, ID int) *Servo {
 	return &Servo{
-		Network:   network,
+		Protocol:  proto,
 		ID:        ID,
 		registers: registers,
 		zeroAngle: 150,
@@ -46,8 +46,8 @@ func New(network iface.Networker, registers reg.Map, ID int) *Servo {
 // NewWithReturnLevel returns a servo with its Return Level preconfigured. It's
 // better to use New and SetReturnLevel to be sure, but this can be useful when
 // we're absolutely sure what the return level currently is.
-func NewWithReturnLevel(network iface.Networker, registers reg.Map, ID int, returnLevel int) *Servo {
-	s := New(network, registers, ID)
+func NewWithReturnLevel(proto iface.Protocol, registers reg.Map, ID int, returnLevel int) *Servo {
+	s := New(proto, registers, ID)
 	s.returnLevelValue = returnLevel
 	s.returnLevelKnown = true
 	return s
@@ -76,7 +76,7 @@ func (s *Servo) SetReturnLevel(value int) error {
 	// return status level will depend upon the new level, rather than the
 	// current level. We don't want to update that until we're sure that the write
 	// was successful.
-	err := s.Network.WriteData(s.ID, int(reg.Address), []byte{utils.Low(value)}, (value == 2))
+	err := s.Protocol.WriteData(s.ID, int(reg.Address), []byte{utils.Low(value)}, (value == 2))
 	if err != nil {
 		return err
 	}
@@ -111,7 +111,7 @@ func (s *Servo) FetchReturnLevel() error {
 	// one (return only for READ commands), or two (return for all commands).
 
 	r := s.registers[reg.StatusReturnLevel]
-	b, err := s.Network.ReadData(s.ID, int(r.Address), r.Length)
+	b, err := s.Protocol.ReadData(s.ID, int(r.Address), r.Length)
 	if err == nil {
 		s.returnLevelKnown = true
 		s.returnLevelValue = int(b[0])
@@ -153,7 +153,7 @@ func (servo *Servo) getRegister(n reg.RegName) (int, error) {
 		return 0, errors.New("can't READ while Return Level is zero")
 	}
 
-	b, err := servo.Network.ReadData(servo.ID, int(r.Address), r.Length)
+	b, err := servo.Protocol.ReadData(servo.ID, int(r.Address), r.Length)
 	if err != nil {
 		return 0, err
 	}
@@ -195,10 +195,10 @@ func (servo *Servo) setRegister(n reg.RegName, value int) error {
 	// TODO: Add log message when setting a register.
 	switch r.Length {
 	case 1:
-		err = servo.Network.WriteData(servo.ID, int(r.Address), []byte{utils.Low(value)}, (rl == 2))
+		err = servo.Protocol.WriteData(servo.ID, int(r.Address), []byte{utils.Low(value)}, (rl == 2))
 
 	case 2:
-		err = servo.Network.WriteData(servo.ID, int(r.Address), []byte{utils.Low(value), utils.High(value)}, (rl == 2))
+		err = servo.Protocol.WriteData(servo.ID, int(r.Address), []byte{utils.Low(value), utils.High(value)}, (rl == 2))
 
 	default:
 		err = fmt.Errorf("invalid register length: %d", r.Length)
@@ -211,5 +211,5 @@ func (servo *Servo) setRegister(n reg.RegName, value int) error {
 // nil if the ping succeeds, otherwise an error. It's optional, but a very good
 // idea, to call this before sending any other instructions to the servo.
 func (servo *Servo) Ping() error {
-	return servo.Network.Ping(uint8(servo.ID))
+	return servo.Protocol.Ping(uint8(servo.ID))
 }

@@ -26,7 +26,7 @@ const (
 	BroadcastIdent byte = 0xFE // 254
 )
 
-type Network struct {
+type Proto1 struct {
 	Serial io.ReadWriteCloser
 
 	// The time to wait for a single read to complete before giving up.
@@ -40,8 +40,8 @@ type Network struct {
 	buffered bool
 }
 
-func New(serial io.ReadWriteCloser) *Network {
-	return &Network{
+func New(serial io.ReadWriteCloser) *Proto1 {
+	return &Proto1{
 		Serial:   serial,
 		Timeout:  128 * time.Millisecond,
 		Logger:   nil,
@@ -55,11 +55,11 @@ func New(serial io.ReadWriteCloser) *Network {
 // they'll all be executed at once.
 //
 // This is very useful for synchronizing the movements of multiple servos.
-func (n *Network) SetBuffered(buffered bool) {
+func (n *Proto1) SetBuffered(buffered bool) {
 	n.buffered = buffered
 }
 
-func (n *Network) SetLogger(logger iface.Logger) {
+func (n *Proto1) SetLogger(logger iface.Logger) {
 	n.Logger = logger
 }
 
@@ -111,7 +111,7 @@ func DecodeStatusError(errBits byte) error {
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_instruction.htm
 
-func (n *Network) WriteInstruction(ident byte, instruction byte, params ...byte) error {
+func (n *Proto1) WriteInstruction(ident byte, instruction byte, params ...byte) error {
 	buf := new(bytes.Buffer)
 	paramsLength := byte(len(params) + 2)
 
@@ -153,7 +153,7 @@ func (n *Network) WriteInstruction(ident byte, instruction byte, params ...byte)
 // immediately available. Returns a slice containing the bytes read. If the
 // network timeout is reached, returns the bytes read so far (which might be
 // none) and an error.
-func (n *Network) read(count int) ([]byte, error) {
+func (n *Proto1) read(count int) ([]byte, error) {
 	start := time.Now()
 	buf := make([]byte, count)
 	retry := 1 * time.Millisecond
@@ -185,7 +185,7 @@ func (n *Network) read(count int) ([]byte, error) {
 	return buf, nil
 }
 
-func (n *Network) ReadStatusPacket(expectIdent byte) ([]byte, error) {
+func (n *Proto1) ReadStatusPacket(expectIdent byte) ([]byte, error) {
 
 	//
 	// Status packets are similar to instruction packet:
@@ -284,7 +284,7 @@ func (n *Network) ReadStatusPacket(expectIdent byte) ([]byte, error) {
 
 // Ping sends the PING instruction to the given Servo ID, and waits for the
 // response. Returns an error if the ping fails, or nil if it succeeds.
-func (n *Network) Ping(ident byte) error {
+func (n *Proto1) Ping(ident byte) error {
 	n.Logf("Ping(%d)", ident)
 
 	writeErr := n.WriteInstruction(ident, Ping)
@@ -305,7 +305,7 @@ func (n *Network) Ping(ident byte) error {
 // ReadData reads a slice of count bytes from the control table of the given
 // servo ID. Use the bytesToInt function to convert the output to something more
 // useful.
-func (n *Network) ReadData(ident int, addr int, count int) ([]byte, error) {
+func (n *Proto1) ReadData(ident int, addr int, count int) ([]byte, error) {
 	ib := utils.Low(ident)
 
 	params := []byte{
@@ -326,7 +326,7 @@ func (n *Network) ReadData(ident int, addr int, count int) ([]byte, error) {
 	return buf, nil
 }
 
-func (n *Network) WriteData(ident int, address int, data []byte, expectStausPacket bool) error {
+func (n *Proto1) WriteData(ident int, address int, data []byte, expectStausPacket bool) error {
 	ib := utils.Low(ident)
 
 	var instruction byte
@@ -360,12 +360,12 @@ func (n *Network) WriteData(ident int, address int, data []byte, expectStausPack
 // Action broadcasts the ACTION instruction, which initiates any previously
 // bufferred instructions. Doesn't wait for a status packet in response, because
 // they are not sent in response to broadcast instructions.
-func (n *Network) Action() error {
+func (n *Proto1) Action() error {
 	return n.WriteInstruction(BroadcastIdent, Action)
 }
 
 // Logf writes a message to the network logger, unless it's nil.
-func (n *Network) Logf(format string, v ...interface{}) {
+func (n *Proto1) Logf(format string, v ...interface{}) {
 	if n.Logger != nil {
 		n.Logger.Printf(format, v)
 	}

@@ -32,7 +32,7 @@ const (
 	BroadcastIdent byte = 0xFE // 254
 )
 
-type Network struct {
+type Proto2 struct {
 	Serial io.ReadWriteCloser
 
 	// The time to wait for a single read to complete before giving up.
@@ -46,8 +46,8 @@ type Network struct {
 	buffered bool
 }
 
-func New(serial io.ReadWriteCloser) *Network {
-	return &Network{
+func New(serial io.ReadWriteCloser) *Proto2 {
+	return &Proto2{
 		Serial:   serial,
 		Timeout:  10 * time.Millisecond,
 		Logger:   nil,
@@ -61,11 +61,11 @@ func New(serial io.ReadWriteCloser) *Network {
 // they'll all be executed at once.
 //
 // This is very useful for synchronizing the movements of multiple servos.
-func (n *Network) SetBuffered(buffered bool) {
+func (n *Proto2) SetBuffered(buffered bool) {
 	n.buffered = buffered
 }
 
-func (n *Network) SetLogger(logger iface.Logger) {
+func (n *Proto2) SetLogger(logger iface.Logger) {
 	n.Logger = logger
 }
 
@@ -146,7 +146,7 @@ func DecodePacketError(err byte) error {
 
 // See:
 // http://support.robotis.com/en/product/dynamixel_pro/communication/instruction_status_packet.htm
-func (network *Network) WriteInstruction(ident uint8, instruction byte, params ...byte) error {
+func (network *Proto2) WriteInstruction(ident uint8, instruction byte, params ...byte) error {
 	buf := new(bytes.Buffer)
 	paramsLength := byte(len(params) + 3)
 
@@ -190,7 +190,7 @@ func (network *Network) WriteInstruction(ident uint8, instruction byte, params .
 // immediately available. Returns a slice containing the bytes read. If the
 // network timeout is reached, returns the bytes read so far (which might be
 // none) and an error.
-func (network *Network) read(n int) ([]byte, error) {
+func (network *Proto2) read(n int) ([]byte, error) {
 	start := time.Now()
 	buf := make([]byte, n)
 	retry := 1 * time.Millisecond
@@ -224,7 +224,7 @@ func (network *Network) read(n int) ([]byte, error) {
 	return buf, nil
 }
 
-func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
+func (network *Proto2) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 
 	// +------+------+------+----------+----+-------+-------+-------------+-------+-------+-----+-------+-------+-------+
 	// | 0xFF | 0xFF | 0xFD |   0x00   | ID | LEN_L | LEN_H |    0x55     | Error |Param1 | ... |ParamN | CRL_L | CRL_H |
@@ -299,7 +299,7 @@ func (network *Network) ReadStatusPacket(expectIdent uint8) ([]byte, error) {
 
 // Ping sends the PING instruction to the given Servo ID, and waits for the
 // response. Returns an error if the ping fails, or nil if it succeeds.
-func (n *Network) Ping(ident uint8) error {
+func (n *Proto2) Ping(ident uint8) error {
 
 	// HACK: Ping responses can take forever on XL-320s, but we don't want to raise the timeout for everything.
 	ot := n.Timeout
@@ -330,7 +330,7 @@ func (n *Network) Ping(ident uint8) error {
 // ReadData reads a slice of n bytes from the control table of the given servo
 // ID. Use the bytesToInt function to convert the output to something more
 // useful.
-func (network *Network) ReadData(ident int, addr int, n int) ([]byte, error) {
+func (network *Proto2) ReadData(ident int, addr int, n int) ([]byte, error) {
 	network.Logf("-- ReadData %d, 0x%x, %d\n", ident, addr, n)
 	ib := utils.Low(ident)
 	t := time.Now()
@@ -356,7 +356,7 @@ func (network *Network) ReadData(ident int, addr int, n int) ([]byte, error) {
 	return buf, nil
 }
 
-func (n *Network) WriteData(ident int, addr int, params []byte, expectStausPacket bool) error {
+func (n *Proto2) WriteData(ident int, addr int, params []byte, expectStausPacket bool) error {
 	n.Logf("-- WriteData: ident=%d, expectStausPacket=%t, addr=0x%x, params=%v\n", ident, expectStausPacket, addr, params)
 	ib := utils.Low(ident)
 
@@ -395,11 +395,11 @@ func (n *Network) WriteData(ident int, addr int, params []byte, expectStausPacke
 // Action broadcasts the ACTION instruction, which initiates any previously
 // bufferred instructions. Doesn't wait for a status packet in response, because
 // they are not sent in response to broadcast instructions.
-func (n *Network) Action() error {
+func (n *Proto2) Action() error {
 	return n.WriteInstruction(BroadcastIdent, Action)
 }
 
-func (nw *Network) Flush() {
+func (nw *Proto2) Flush() {
 	buf := make([]byte, 128)
 	var n int
 
@@ -412,32 +412,32 @@ func (nw *Network) Flush() {
 	}
 }
 
-func (n *Network) FactoryReset() error {
+func (n *Proto2) FactoryReset() error {
 	panic("not implemented: Network.FactoryReset")
 }
 
-func (n *Network) Reboot() error {
+func (n *Proto2) Reboot() error {
 	panic("not implemented: Network.Reboot")
 }
 
-func (n *Network) SyncRead() error {
+func (n *Proto2) SyncRead() error {
 	panic("not implemented: Network.SyncRead")
 }
 
-func (n *Network) SyncWrite() error {
+func (n *Proto2) SyncWrite() error {
 	panic("not implemented: Network.SyncWrite")
 }
 
-func (n *Network) BulkRead() error {
+func (n *Proto2) BulkRead() error {
 	panic("not implemented: Network.BulkRead")
 }
 
-func (n *Network) BulkWrite() error {
+func (n *Proto2) BulkWrite() error {
 	panic("not implemented: Network.BulkWrite")
 }
 
 // Logf writes a message to the network logger, unless it's nil.
-func (n *Network) Logf(format string, v ...interface{}) {
+func (n *Proto2) Logf(format string, v ...interface{}) {
 	if n.Logger != nil {
 		n.Logger.Printf(format, v...)
 	}

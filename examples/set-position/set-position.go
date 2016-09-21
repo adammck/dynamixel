@@ -41,7 +41,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var nw iface.Networker
+	var nw iface.Protocol
 	var servo *servo.Servo
 
 	switch *model {

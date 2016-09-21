@@ -3,6 +3,7 @@ package servo
 import (
 	"testing"
 
+	"github.com/adammck/dynamixel/iface"
 	reg "github.com/adammck/dynamixel/registers"
 	"github.com/stretchr/testify/assert"
 )
@@ -113,7 +114,7 @@ func TestVoltage(t *testing.T) {
 
 // MockNetwork provides a fake servo, with a control table which can be read
 // from and written to like a real servo.
-type mockNetwork struct {
+type mockProto struct {
 	controlTable [50]byte
 }
 
@@ -121,7 +122,7 @@ type mockNetwork struct {
 // initially contains the given bytes. The control table is empty, except that
 // the servo ID is 1, and the status return level is 2. (This is just to avoid
 // having to specify the same values for every test.)
-func servo(r reg.Map, b map[int]byte) (*mockNetwork, *Servo) {
+func servo(r reg.Map, b map[int]byte) (*mockProto, *Servo) {
 
 	// Start with the minimal set of registers, which are required for anything
 	// to work. Everything else is optional, so we leave it to the test(s).
@@ -136,7 +137,7 @@ func servo(r reg.Map, b map[int]byte) (*mockNetwork, *Servo) {
 	}
 
 	// Pre-configure servo as #1, in verbose mode.
-	n := &mockNetwork{}
+	n := &mockProto{}
 	n.controlTable[m[reg.ServoID].Address] = byte(1)
 	n.controlTable[m[reg.StatusReturnLevel].Address] = byte(2)
 
@@ -149,23 +150,30 @@ func servo(r reg.Map, b map[int]byte) (*mockNetwork, *Servo) {
 	return n, s
 }
 
-func (n *mockNetwork) Ping(ident uint8) error {
+// Not implemented
+func (n *mockProto) Ping(ident uint8) error {
 	return nil
 }
 
-func (n *mockNetwork) ReadData(ident uint8, addr byte, count int) ([]byte, error) {
+// Not implemented
+func (n *mockProto) Logf(format string, v ...interface{}) {
+}
+
+// Not implemented
+func (n *mockProto) SetLogger(logger iface.Logger) {
+}
+
+func (n *mockProto) ReadData(ident int, addr int, count int) ([]byte, error) {
 	return n.controlTable[int(addr) : int(addr)+count], nil
 }
 
-func (n *mockNetwork) WriteData(ident uint8, expectStausPacket bool, params ...byte) error {
-	addr := int(params[0])
-
-	for i, val := range params[1:] {
-		n.controlTable[addr+i] = val
+func (n *mockProto) WriteData(ident int, address int, data []byte, expectResponse bool) error {
+	for i, val := range data {
+		n.controlTable[address+i] = val
 	}
 
 	return nil
 }
 
-func (n *mockNetwork) Log(string, ...interface{}) {
+func (n *mockProto) Log(string, ...interface{}) {
 }
