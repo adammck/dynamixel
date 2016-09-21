@@ -20,13 +20,11 @@ const (
 	SyncWrite byte = 0x83
 
 	// Send an instruction to all servos
-	BroadcastIdent byte = 0xFE // 254
+	BroadcastIdent int = 0xFE // 254
 )
 
 type Proto1 struct {
-	Network iface.Networker
-
-	// Whether the network is currently in bufferred write mode.
+	Network  iface.Networker
 	buffered bool
 }
 
@@ -52,26 +50,26 @@ func (p *Proto1) SetBuffered(buffered bool) {
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_instruction.htm
 
-func (p *Proto1) writeInstruction(ident byte, instruction byte, params ...byte) error {
+func (p *Proto1) writeInstruction(ident int, instruction byte, params []byte) error {
 	buf := new(bytes.Buffer)
-	paramsLength := byte(len(params) + 2)
+	id := byte(ident & 0xFF)
+	pLen := byte(len(params) + 2)
 
 	// build instruction packet
 
 	buf.Write([]byte{
-		0xFF,               // header
-		0xFF,               // header
-		byte(ident),        // target Dynamixel ID
-		byte(paramsLength), // len(params) + 2
-		instruction,        // instruction type (read/write/etc)
+		0xFF,        // header
+		0xFF,        // header
+		id,          // target Dynamixel ID
+		pLen,        // len(params) + 2
+		instruction, // instruction type (read/write/etc)
 	})
 
 	buf.Write(params)
 
 	// calculate checksum
 
-	sum := byte(ident) + paramsLength + instruction
-
+	sum := id + pLen + instruction
 	for _, value := range params {
 		sum += value
 	}
@@ -87,7 +85,8 @@ func (p *Proto1) writeInstruction(ident byte, instruction byte, params ...byte) 
 	return nil
 }
 
-func (p *Proto1) readStatusPacket(expectIdent byte) ([]byte, error) {
+func (p *Proto1) readStatusPacket(expectIdent int) ([]byte, error) {
+	id := byte(expectIdent & 0xFF)
 
 	//
 	// Status packets are similar to instruction packet:
@@ -169,8 +168,8 @@ func (p *Proto1) readStatusPacket(expectIdent byte) ([]byte, error) {
 	// return an error if we received a packet with the wrong ID. this indicates
 	// a concurrency issue (maybe clashing IDs on a single bus).
 
-	if resIdent != expectIdent {
-		return []byte{}, fmt.Errorf("expected status packet for %v, but got %v", expectIdent, resIdent)
+	if resIdent != id {
+		return []byte{}, fmt.Errorf("expected status packet for %v, but got %v", id, resIdent)
 	}
 
 	// omg, nothing went wrong
@@ -181,16 +180,14 @@ func (p *Proto1) readStatusPacket(expectIdent byte) ([]byte, error) {
 // Ping sends the PING instruction to the given Servo ID, and waits for the
 // response. Returns an error if the ping fails, or nil if it succeeds.
 func (p *Proto1) Ping(ident int) error {
-	ib := utils.Low(ident)
-
-	writeErr := p.writeInstruction(ib, Ping)
+	writeErr := p.writeInstruction(ident, Ping, nil)
 	if writeErr != nil {
 		return writeErr
 	}
 
 	// There's no way to disable the status packet for PING commands, so always
 	// wait for it. That's how we know that the servo is responding.
-	_, readErr := p.readStatusPacket(ib)
+	_, readErr := p.readStatusPacket(ident)
 	if readErr != nil {
 		return readErr
 	}
@@ -202,19 +199,17 @@ func (p *Proto1) Ping(ident int) error {
 // servo ID. Use the bytesToInt function to convert the output to something more
 // useful.
 func (p *Proto1) ReadData(ident int, addr int, count int) ([]byte, error) {
-	ib := utils.Low(ident)
-
 	params := []byte{
 		utils.Low(addr),
 		byte(count),
 	}
 
-	err := p.writeInstruction(ib, ReadData, params...)
+	err := p.writeInstruction(ident, ReadData, params)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	buf, err := p.readStatusPacket(ib)
+	buf, err := p.readStatusPacket(ident)
 	if err != nil {
 		return buf, err
 	}
@@ -223,8 +218,6 @@ func (p *Proto1) ReadData(ident int, addr int, count int) ([]byte, error) {
 }
 
 func (p *Proto1) WriteData(ident int, address int, data []byte, expectResponse bool) error {
-	ib := utils.Low(ident)
-
 	var instruction byte
 
 	if p.buffered {
@@ -238,13 +231,13 @@ func (p *Proto1) WriteData(ident int, address int, data []byte, expectResponse b
 	ps[0] = utils.Low(address)
 	copy(ps[1:], data)
 
-	writeErr := p.writeInstruction(ib, instruction, ps...)
+	writeErr := p.writeInstruction(ident, instruction, ps)
 	if writeErr != nil {
 		return writeErr
 	}
 
 	if expectResponse {
-		_, readErr := p.readStatusPacket(ib)
+		_, readErr := p.readStatusPacket(ident)
 		if readErr != nil {
 			return readErr
 		}
@@ -257,5 +250,5 @@ func (p *Proto1) WriteData(ident int, address int, data []byte, expectResponse b
 // bufferred instructions. Doesn't wait for a status packet in response, because
 // they are not sent in response to broadcast instructions.
 func (p *Proto1) Action() error {
-	return p.writeInstruction(BroadcastIdent, Action)
+	return p.writeInstruction(BroadcastIdent, Action, nil)
 }

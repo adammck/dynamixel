@@ -7,8 +7,9 @@ import (
 	"os"
 
 	"github.com/adammck/dynamixel/iface"
-	network1 "github.com/adammck/dynamixel/protocol/v1"
-	network2 "github.com/adammck/dynamixel/protocol/v2"
+	"github.com/adammck/dynamixel/network"
+	p1 "github.com/adammck/dynamixel/protocol/v1"
+	p2 "github.com/adammck/dynamixel/protocol/v2"
 	"github.com/adammck/dynamixel/servo"
 	"github.com/adammck/dynamixel/servo/ax"
 	"github.com/adammck/dynamixel/servo/xl"
@@ -17,7 +18,7 @@ import (
 
 var (
 	portName = flag.String("port", "/dev/tty.usbserial-A9ITPZVR", "the serial port path")
-	servoId  = flag.Int("id", 1, "the ID of the servo to move")
+	servoID  = flag.Int("id", 1, "the ID of the servo to move")
 	model    = flag.String("model", "ax", "the model of the servo to move")
 	position = flag.Int("position", 512, "the goal position to set")
 	debug    = flag.Bool("debug", false, "show serial traffic")
@@ -41,30 +42,32 @@ func main() {
 		os.Exit(1)
 	}
 
-	var nw iface.Protocol
+	network := network.New(serial)
+	if *debug {
+		network.SetLogger(log.New(os.Stderr, "", log.LstdFlags))
+	}
+
+	network.Flush()
+
+	var proto iface.Protocol
 	var servo *servo.Servo
 
 	switch *model {
 	case "ax":
-		nw = network1.New(serial)
-		servo, err = ax.New(nw, *servoId)
+		proto = p1.New(network)
+		servo, err = ax.New(proto, *servoID)
 
 	case "xl":
-		nw = network2.New(serial)
-		servo, err = xl.New(nw, *servoId)
+		proto = p2.New(network)
+		servo, err = xl.New(proto, *servoID)
 
 	default:
 		fmt.Printf("unsupported servo model: %s\n", *model)
-		os.Exit(1)
 	}
 
 	if err != nil {
 		fmt.Printf("servo init error: %s\n", err)
 		os.Exit(1)
-	}
-
-	if *debug {
-		nw.SetLogger(log.New(os.Stderr, "", log.LstdFlags))
 	}
 
 	err = servo.Ping()

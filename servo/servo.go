@@ -91,18 +91,18 @@ func (s *Servo) SetReturnLevel(value int) error {
 // ReturnLevel returns the current return level of the servo, or an error if we
 // don't know. This method will never actually read from the control table,
 // because it's expected to be called by getters are setters.
-func (servo *Servo) ReturnLevel() (int, error) {
+func (s *Servo) ReturnLevel() (int, error) {
 
 	// We don't know what the return level is, so take a moment to figure it
 	// out. This is unfortunate, but much better than guessing.
-	if !servo.returnLevelKnown {
-		err := servo.FetchReturnLevel()
+	if !s.returnLevelKnown {
+		err := s.FetchReturnLevel()
 		if err != nil {
 			return 0, err
 		}
 	}
 
-	return servo.returnLevelValue, nil
+	return s.returnLevelValue, nil
 }
 
 func (s *Servo) FetchReturnLevel() error {
@@ -135,8 +135,8 @@ func (s *Servo) FetchReturnLevel() error {
 }
 
 // getRegister fetches the value of a register from the control table.
-func (servo *Servo) getRegister(n reg.RegName) (int, error) {
-	r, ok := servo.registers[n]
+func (s *Servo) getRegister(n reg.RegName) (int, error) {
+	r, ok := s.registers[n]
 	if !ok {
 		return 0, fmt.Errorf("can't read unsupported register: %v", n)
 	}
@@ -145,7 +145,7 @@ func (servo *Servo) getRegister(n reg.RegName) (int, error) {
 		return 0, fmt.Errorf("invalid register length: %d", r.Length)
 	}
 
-	rl, err := servo.ReturnLevel()
+	rl, err := s.ReturnLevel()
 	if err != nil {
 		return 0, err
 	}
@@ -153,7 +153,7 @@ func (servo *Servo) getRegister(n reg.RegName) (int, error) {
 		return 0, errors.New("can't READ while Return Level is zero")
 	}
 
-	b, err := servo.Protocol.ReadData(servo.ID, int(r.Address), r.Length)
+	b, err := s.Protocol.ReadData(s.ID, int(r.Address), r.Length)
 	if err != nil {
 		return 0, err
 	}
@@ -167,8 +167,8 @@ func (servo *Servo) getRegister(n reg.RegName) (int, error) {
 
 // setRegister writes a value to the given register. Returns an error if the
 // register is read only or if the write failed.
-func (servo *Servo) setRegister(n reg.RegName, value int) error {
-	r, ok := servo.registers[n]
+func (s *Servo) setRegister(n reg.RegName, value int) error {
+	r, ok := s.registers[n]
 	if !ok {
 		return fmt.Errorf("can't write to unsupported register: %v", n)
 	}
@@ -187,7 +187,7 @@ func (servo *Servo) setRegister(n reg.RegName, value int) error {
 
 	// Refuse to write if we don't know the return level, because we can't know
 	// whether to wait for a status packet or not.
-	rl, err := servo.ReturnLevel()
+	rl, err := s.ReturnLevel()
 	if err != nil {
 		return err
 	}
@@ -195,10 +195,10 @@ func (servo *Servo) setRegister(n reg.RegName, value int) error {
 	// TODO: Add log message when setting a register.
 	switch r.Length {
 	case 1:
-		err = servo.Protocol.WriteData(servo.ID, int(r.Address), []byte{utils.Low(value)}, (rl == 2))
+		err = s.Protocol.WriteData(s.ID, int(r.Address), []byte{utils.Low(value)}, (rl == 2))
 
 	case 2:
-		err = servo.Protocol.WriteData(servo.ID, int(r.Address), []byte{utils.Low(value), utils.High(value)}, (rl == 2))
+		err = s.Protocol.WriteData(s.ID, int(r.Address), []byte{utils.Low(value), utils.High(value)}, (rl == 2))
 
 	default:
 		err = fmt.Errorf("invalid register length: %d", r.Length)
@@ -210,6 +210,6 @@ func (servo *Servo) setRegister(n reg.RegName, value int) error {
 // Ping sends the PING instruction to servo, and waits for the response. Returns
 // nil if the ping succeeds, otherwise an error. It's optional, but a very good
 // idea, to call this before sending any other instructions to the servo.
-func (servo *Servo) Ping() error {
-	return servo.Protocol.Ping(servo.ID)
+func (s *Servo) Ping() error {
+	return s.Protocol.Ping(s.ID)
 }

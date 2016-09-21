@@ -7,7 +7,6 @@ import (
 
 	"github.com/adammck/dynamixel/iface"
 	"github.com/adammck/dynamixel/network"
-	"github.com/adammck/dynamixel/utils"
 )
 
 const (
@@ -27,13 +26,11 @@ const (
 	BulkWrite    byte = 0x93
 
 	// Send an instruction to all servos
-	BroadcastIdent byte = 0xFE // 254
+	BroadcastIdent int = 0xFE // 254
 )
 
 type Proto2 struct {
-	Network iface.Networker
-
-	// Whether the network is currently in bufferred write mode.
+	Network  iface.Networker
 	buffered bool
 }
 
@@ -56,9 +53,10 @@ func (p *Proto2) SetBuffered(buffered bool) {
 
 // See:
 // http://support.robotis.com/en/product/dynamixel_pro/communication/instruction_status_packet.htm
-func (p *Proto2) writeInstruction(ident uint8, instruction byte, params ...byte) error {
+func (p *Proto2) writeInstruction(ident int, instruction byte, params []byte) error {
 	buf := new(bytes.Buffer)
-	paramsLength := byte(len(params) + 3)
+	id := byte(ident & 0xFF)
+	pLen := len(params) + 3
 
 	// +------+------+------+----------+----+-------+-------+-------------+--------+-----+--------+-------+-------+
 	// | 0xFF | 0xFF | 0xFD |   0x00   | ID | LEN_L | LEN_H |    INST     | Param1 | ... | ParamN | CRL_L | CRL_H |
@@ -67,14 +65,14 @@ func (p *Proto2) writeInstruction(ident uint8, instruction byte, params ...byte)
 	// +--------------------+----------+----+---------------+-------------+-----------------------+---------------+
 
 	buf.Write([]byte{
-		0xFF,                       // Header
-		0xFF,                       // Header
-		0xFD,                       // Header
-		0x00,                       // Reserved
-		byte(ident),                // target ID
-		paramsLength & 0xFF,        // LSB: len(params) + 3
-		(paramsLength >> 8) & 0xFF, // MSB: len(params) + 3
-		instruction,                // instruction type (see const section)
+		0xFF,                     // Header
+		0xFF,                     // Header
+		0xFD,                     // Header
+		0x00,                     // Reserved
+		id,                       // target ID
+		byte(pLen & 0xFF),        // LSB: len(params) + 3
+		byte((pLen >> 8) & 0xFF), // MSB: len(params) + 3
+		instruction,              // instruction type (see const section)
 	})
 
 	// append n params
@@ -95,7 +93,8 @@ func (p *Proto2) writeInstruction(ident uint8, instruction byte, params ...byte)
 	return nil
 }
 
-func (p *Proto2) readStatusPacket(expectIdent uint8) ([]byte, error) {
+func (p *Proto2) readStatusPacket(expectIdent int) ([]byte, error) {
+	id := byte(expectIdent & 0xFF)
 
 	// +------+------+------+----------+----+-------+-------+-------------+-------+-------+-----+-------+-------+-------+
 	// | 0xFF | 0xFF | 0xFD |   0x00   | ID | LEN_L | LEN_H |    0x55     | Error |Param1 | ... |ParamN | CRL_L | CRL_H |
@@ -157,7 +156,7 @@ func (p *Proto2) readStatusPacket(expectIdent uint8) ([]byte, error) {
 	// Return an error if we received a packet with the wrong ID. This indicates
 	// a concurrency issue (maybe clashing IDs on a single bus).
 
-	if resIdent != expectIdent {
+	if resIdent != id {
 		return nil, fmt.Errorf("expected status packet for %v, but got %v", expectIdent, resIdent)
 	}
 
@@ -167,7 +166,6 @@ func (p *Proto2) readStatusPacket(expectIdent uint8) ([]byte, error) {
 // Ping sends the PING instruction to the given Servo ID, and waits for the
 // response. Returns an error if the ping fails, or nil if it succeeds.
 func (p *Proto2) Ping(ident int) error {
-	ib := utils.Low(ident)
 
 	// HACK: Ping responses can take forever on XL-320s, but we don't want to raise the timeout for everything.
 	nw := p.Network.(*network.Network)
@@ -177,14 +175,14 @@ func (p *Proto2) Ping(ident int) error {
 		nw.Timeout = ot
 	}()
 
-	err := p.writeInstruction(ib, Ping)
+	err := p.writeInstruction(ident, Ping, nil)
 	if err != nil {
 		return err
 	}
 
 	// There's no way to disable the status packet for PING commands, so always
 	// wait for it. That's how we know that the servo is responding.
-	_, err = p.readStatusPacket(ib)
+	_, err = p.readStatusPacket(ident)
 	if err != nil {
 		return err
 	}
@@ -196,8 +194,6 @@ func (p *Proto2) Ping(ident int) error {
 // ID. Use the bytesToInt function to convert the output to something more
 // useful.
 func (p *Proto2) ReadData(ident int, addr int, n int) ([]byte, error) {
-	ib := utils.Low(ident)
-
 	params := []byte{
 		byte(addr & 0xFF),        // LSB
 		byte((addr >> 8) & 0xFF), // MSB
@@ -205,12 +201,12 @@ func (p *Proto2) ReadData(ident int, addr int, n int) ([]byte, error) {
 		byte((n >> 8) & 0xFF),    // MSB
 	}
 
-	err := p.writeInstruction(ib, ReadData, params...)
+	err := p.writeInstruction(ident, ReadData, params)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	buf, err := p.readStatusPacket(ib)
+	buf, err := p.readStatusPacket(ident)
 	if err != nil {
 		return buf, err
 	}
@@ -218,9 +214,7 @@ func (p *Proto2) ReadData(ident int, addr int, n int) ([]byte, error) {
 	return buf, nil
 }
 
-func (p *Proto2) WriteData(ident int, addr int, params []byte, expectStausPacket bool) error {
-	ib := utils.Low(ident)
-
+func (p *Proto2) WriteData(ident int, addr int, params []byte, expectResponse bool) error {
 	var instruction byte
 	if p.buffered {
 		instruction = RegWrite
@@ -233,13 +227,13 @@ func (p *Proto2) WriteData(ident int, addr int, params []byte, expectStausPacket
 	ps[1] = byte((addr >> 8) & 0xFF) // MSB
 	copy(ps[2:], params)
 
-	writeErr := p.writeInstruction(ib, instruction, ps...)
+	writeErr := p.writeInstruction(ident, instruction, ps)
 	if writeErr != nil {
 		return writeErr
 	}
 
-	if expectStausPacket {
-		_, err := p.readStatusPacket(ib)
+	if expectResponse {
+		_, err := p.readStatusPacket(ident)
 		if err != nil {
 			return err
 		}
@@ -252,5 +246,5 @@ func (p *Proto2) WriteData(ident int, addr int, params []byte, expectStausPacket
 // bufferred instructions. Doesn't wait for a status packet in response, because
 // they are not sent in response to broadcast instructions.
 func (p *Proto2) Action() error {
-	return p.writeInstruction(BroadcastIdent, Action)
+	return p.writeInstruction(BroadcastIdent, Action, nil)
 }

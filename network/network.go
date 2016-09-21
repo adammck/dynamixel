@@ -72,32 +72,32 @@ func (nw *Network) Read(n int) ([]byte, error) {
 	return buf, nil
 }
 
-func (n *Network) Write(p []byte) (int, error) {
-	n.Logf(">> %#v\n", p)
-	return n.Serial.Write(p)
+func (nw *Network) Write(p []byte) (int, error) {
+	nw.Logf(">> %#v\n", p)
+	return nw.Serial.Write(p)
 }
 
 // Ping sends the PING instruction to the given Servo ID, and waits for the
 // response. Returns an error if the ping fails, or nil if it succeeds.
-func (n *Network) Ping(ident uint8) error {
+func (nw *Network) Ping(ident uint8) error {
 	return nil
 }
 
 // ReadData reads a slice of n bytes from the control table of the given servo
 // ID. Use the bytesToInt function to convert the output to something more
 // useful.
-func (n *Network) ReadData(ident int, addr int, count int) ([]byte, error) {
+func (nw *Network) ReadData(ident int, addr int, count int) ([]byte, error) {
 	return nil, nil
 }
 
-func (n *Network) WriteData(ident int, addr int, params []byte, expectStausPacket bool) error {
+func (nw *Network) WriteData(ident int, addr int, params []byte, expectStausPacket bool) error {
 	return nil
 }
 
 // Action broadcasts the ACTION instruction, which initiates any previously
 // bufferred instructions. Doesn't wait for a status packet in response, because
 // they are not sent in response to broadcast instructions.
-func (n *Network) Action() error {
+func (nw *Network) Action() error {
 	return nil
 }
 
@@ -114,13 +114,13 @@ func (nw *Network) Flush() {
 	}
 }
 
-func (n *Network) SetLogger(logger iface.Logger) {
-	n.Logger = logger
+func (nw *Network) SetLogger(logger iface.Logger) {
+	nw.Logger = logger
 }
 
 // Logf writes a message to the network logger, unless it's nil.
-func (n *Network) Logf(format string, v ...interface{}) {
-	if n.Logger != nil {
-		n.Logger.Printf(format, v...)
+func (nw *Network) Logf(format string, v ...interface{}) {
+	if nw.Logger != nil {
+		nw.Logger.Printf(format, v...)
 	}
 }

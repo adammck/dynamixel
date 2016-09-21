@@ -19,7 +19,7 @@ import (
 
 var (
 	portName = flag.String("port", "/dev/tty.usbserial-A9ITPZVR", "the serial port path")
-	servoId  = flag.Int("id", 1, "the ID of the servo to flash")
+	servoID  = flag.Int("id", 1, "the ID of the servo to flash")
 	model    = flag.String("model", "ax", "the model of the servo to flash")
 	interval = flag.Int("interval", 200, "the time between flashes (ms)")
 	debug    = flag.Bool("debug", false, "show serial traffic")
@@ -56,11 +56,11 @@ func main() {
 	switch *model {
 	case "ax":
 		proto = p1.New(network)
-		servo, err = ax.New(proto, *servoId)
+		servo, err = ax.New(proto, *servoID)
 
 	case "xl":
 		proto = p2.New(network)
-		servo, err = xl.New(proto, *servoId)
+		servo, err = xl.New(proto, *servoID)
 
 	default:
 		fmt.Printf("unsupported servo model: %s\n", *model)

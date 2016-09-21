@@ -22,10 +22,9 @@ func (s *Servo) Angle() (float64, error) {
 
 	if err != nil {
 		return 0, err
-
-	} else {
-		return s.posToAngle(p), nil
 	}
+
+	return s.posToAngle(p), nil
 }
 
 // MoveTo sets the goal position of the servo by angle (in degrees), where zero

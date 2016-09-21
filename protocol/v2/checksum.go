@@ -2,9 +2,9 @@ package v2
 
 // See: http://support.robotis.com/en/product/dynamixel_pro/communication/crc.htm
 func CRC(data []byte) uint16 {
-	var crc_accum uint16
+	var acc uint16
 
-	crc_table := [256]uint16{
+	table := [256]uint16{
 		0x0000, 0x8005, 0x800F, 0x000A, 0x801B, 0x001E, 0x0014, 0x8011,
 		0x8033, 0x0036, 0x003C, 0x8039, 0x0028, 0x802D, 0x8027, 0x0022,
 		0x8063, 0x0066, 0x006C, 0x8069, 0x0078, 0x807D, 0x8077, 0x0072,
@@ -39,15 +39,10 @@ func CRC(data []byte) uint16 {
 		0x8213, 0x0216, 0x021C, 0x8219, 0x0208, 0x820D, 0x8207, 0x0202,
 	}
 
-	// for(j = 0; j < data_blk_size; j++)
-	// {
-	//     i = ((unsigned short)(crc_accum >> 8) ^ data_blk_ptr[j]) & 0xFF;
-	//     crc_accum = (crc_accum << 8) ^ crc_table[i];
-	// }
 	for j := range data {
-		i := (crc_accum>>8 ^ uint16(data[j])) & 0xFF
-		crc_accum = (crc_accum << 8) ^ crc_table[i]
+		i := (acc>>8 ^ uint16(data[j])) & 0xFF
+		acc = (acc << 8) ^ table[i]
 	}
 
-	return crc_accum
+	return acc
 }
