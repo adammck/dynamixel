@@ -5,10 +5,10 @@ import (
 	"fmt"
 )
 
-func decodeError(err byte) error {
+func decodeError(b byte) error {
 	s := ""
 
-	switch err {
+	switch b {
 	case 0x01:
 		s = "result fail"
 
@@ -31,7 +31,7 @@ func decodeError(err byte) error {
 		s = "access error"
 
 	default:
-		s = fmt.Sprintf("unknown error: 0x%X", err)
+		s = fmt.Sprintf("unknown error: 0x%X", b)
 	}
 
 	return errors.New(s)

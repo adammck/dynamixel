@@ -1,6 +1,8 @@
 package xl
 
 import (
+	"io"
+
 	"github.com/adammck/dynamixel/iface"
 	"github.com/adammck/dynamixel/protocol/v2"
 	reg "github.com/adammck/dynamixel/registers"
@@ -9,8 +11,8 @@ import (
 
 // New returns a new XL-320 servo with the given ID.
 // See: http://support.robotis.com/en/product/dynamixel/xl-series/xl-320.htm
-func New(n iface.Networker, ID int) (*servo.Servo, error) {
-	return servo.New(v2.New(n), Registers, ID), nil
+func New(network io.ReadWriter, ID int) (*servo.Servo, error) {
+	return servo.New(v2.New(network), Registers, ID), nil
 }
 
 func NewWithReturnLevel(n iface.Protocol, ID int, returnLevel int) (*servo.Servo, error) {

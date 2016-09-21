@@ -10,38 +10,38 @@ import (
 // about it, because any combination of errors might occur at the same time.
 //
 // See: http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm#Status_Packet
-func decodeError(errBits byte) error {
+func decodeError(b byte) error {
 	str := []string{}
 
-	if errBits&1 == 1 {
+	if b&1 == 1 {
 		str = append(str, "input voltage")
 	}
 
-	if errBits&2 == 2 {
+	if b&2 == 2 {
 		str = append(str, "angle limit")
 	}
 
-	if errBits&4 == 4 {
+	if b&4 == 4 {
 		str = append(str, "overheating")
 	}
 
-	if errBits&8 == 8 {
+	if b&8 == 8 {
 		str = append(str, "range")
 	}
 
-	if errBits&16 == 16 {
+	if b&16 == 16 {
 		str = append(str, "checksum")
 	}
 
-	if errBits&32 == 32 {
+	if b&32 == 32 {
 		str = append(str, "overload")
 	}
 
-	if errBits&64 == 64 {
+	if b&64 == 64 {
 		str = append(str, "instruction")
 	}
 
-	if errBits&128 == 128 {
+	if b&128 == 128 {
 		str = append(str, "unknown")
 	}
 

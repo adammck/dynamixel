@@ -3,8 +3,8 @@ package v1
 import (
 	"bytes"
 	"fmt"
+	"io"
 
-	"github.com/adammck/dynamixel/iface"
 	"github.com/adammck/dynamixel/utils"
 )
 
@@ -24,11 +24,11 @@ const (
 )
 
 type Proto1 struct {
-	Network  iface.Networker
+	Network  io.ReadWriter
 	buffered bool
 }
 
-func New(network iface.Networker) *Proto1 {
+func New(network io.ReadWriter) *Proto1 {
 	return &Proto1{
 		Network:  network,
 		buffered: false,
@@ -85,8 +85,7 @@ func (p *Proto1) writeInstruction(ident int, instruction byte, params []byte) er
 	return nil
 }
 
-func (p *Proto1) readStatusPacket(expectIdent int) ([]byte, error) {
-	id := byte(expectIdent & 0xFF)
+func (p *Proto1) readStatusPacket(expID int) ([]byte, error) {
 
 	//
 	// Status packets are similar to instruction packet:
@@ -106,57 +105,61 @@ func (p *Proto1) readStatusPacket(expectIdent int) ([]byte, error) {
 	// packet refers to. But sometimes, the third byte is another 0xFF. I don't
 	// know why, and I can't seem to find any useful information on the matter.
 
-	headerBuf, headerErr := p.Network.Read(3)
-	if headerErr != nil {
-		return []byte{}, headerErr
+	buf := make([]byte, 3)
+	_, err := p.Network.Read(buf)
+	if err != nil {
+		return []byte{}, err
 	}
 
-	if headerBuf[0] != 0xFF || headerBuf[1] != 0xFF {
-		return []byte{}, fmt.Errorf("bad status packet header: %x %x", headerBuf[0], headerBuf[1])
+	if buf[0] != 0xFF || buf[1] != 0xFF {
+		return []byte{}, fmt.Errorf("bad status packet header: %x %x", buf[0], buf[1])
 	}
 
 	// The third byte should be the ident. But if an extra header byte has shown
 	// up, ignore it and read another byte to replace it.
 
-	resIdent := headerBuf[2]
-	if resIdent == 255 {
+	actID := int(buf[2])
+	if actID == 255 {
 
-		identBuf, identErr := p.Network.Read(1)
+		buf = make([]byte, 1)
+		_, identErr := p.Network.Read(buf)
 		if identErr != nil {
 			return []byte{}, identErr
 		}
 
-		resIdent = identBuf[0]
+		actID = int(buf[0])
 	}
 
 	// The next two bytes are always present, so just read them.
 
-	paramCountAndErrBitsBuf, pcebErr := p.Network.Read(2)
-	if pcebErr != nil {
-		return []byte{}, pcebErr
+	buf = make([]byte, 2)
+	_, err = p.Network.Read(buf)
+	if err != nil {
+		return []byte{}, err
 	}
 
-	numParams := uint8(paramCountAndErrBitsBuf[0]) - 2
-	errBits := paramCountAndErrBitsBuf[1]
-	paramsBuf := make([]byte, numParams)
+	plen := uint8(buf[0]) - 2
+	errBits := buf[1]
+	pbuf := make([]byte, plen)
 
 	// now read the params, if there are any. we must do this before checking
 	// for errors, to avoid leaving junk in the buffer.
 
-	if numParams > 0 {
-		var paramsErr error
-		paramsBuf, paramsErr = p.Network.Read(int(numParams))
-		if paramsErr != nil {
-			return []byte{}, paramsErr
+	if plen > 0 {
+		pbuf := make([]byte, int(plen))
+		_, err = p.Network.Read(pbuf)
+		if err != nil {
+			return []byte{}, err
 		}
 	}
 
 	// read the checksum, which is always one byte
 	// TODO: check the checksum
 
-	_, checksumErr := p.Network.Read(1)
-	if checksumErr != nil {
-		return []byte{}, checksumErr
+	buf = make([]byte, 1)
+	_, err = p.Network.Read(buf)
+	if err != nil {
+		return []byte{}, err
 	}
 
 	// return an error if the packet contained one.
@@ -168,28 +171,28 @@ func (p *Proto1) readStatusPacket(expectIdent int) ([]byte, error) {
 	// return an error if we received a packet with the wrong ID. this indicates
 	// a concurrency issue (maybe clashing IDs on a single bus).
 
-	if resIdent != id {
-		return []byte{}, fmt.Errorf("expected status packet for %v, but got %v", id, resIdent)
+	if actID != expID {
+		return []byte{}, fmt.Errorf("expected status packet for %v, but got %v", expID, actID)
 	}
 
 	// omg, nothing went wrong
 
-	return paramsBuf, nil
+	return pbuf, nil
 }
 
 // Ping sends the PING instruction to the given Servo ID, and waits for the
 // response. Returns an error if the ping fails, or nil if it succeeds.
 func (p *Proto1) Ping(ident int) error {
-	writeErr := p.writeInstruction(ident, Ping, nil)
-	if writeErr != nil {
-		return writeErr
+	err := p.writeInstruction(ident, Ping, nil)
+	if err != nil {
+		return err
 	}
 
 	// There's no way to disable the status packet for PING commands, so always
 	// wait for it. That's how we know that the servo is responding.
-	_, readErr := p.readStatusPacket(ident)
-	if readErr != nil {
-		return readErr
+	_, err = p.readStatusPacket(ident)
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -219,7 +222,6 @@ func (p *Proto1) ReadData(ident int, addr int, count int) ([]byte, error) {
 
 func (p *Proto1) WriteData(ident int, address int, data []byte, expectResponse bool) error {
 	var instruction byte
-
 	if p.buffered {
 		instruction = RegWrite
 	} else {
@@ -231,15 +233,15 @@ func (p *Proto1) WriteData(ident int, address int, data []byte, expectResponse b
 	ps[0] = utils.Low(address)
 	copy(ps[1:], data)
 
-	writeErr := p.writeInstruction(ident, instruction, ps)
-	if writeErr != nil {
-		return writeErr
+	err := p.writeInstruction(ident, instruction, ps)
+	if err != nil {
+		return err
 	}
 
 	if expectResponse {
-		_, readErr := p.readStatusPacket(ident)
-		if readErr != nil {
-			return readErr
+		_, err = p.readStatusPacket(ident)
+		if err != nil {
+			return err
 		}
 	}
 

@@ -3,7 +3,6 @@ package servo
 import (
 	"testing"
 
-	"github.com/adammck/dynamixel/iface"
 	reg "github.com/adammck/dynamixel/registers"
 	"github.com/stretchr/testify/assert"
 )
@@ -151,16 +150,8 @@ func servo(r reg.Map, b map[int]byte) (*mockProto, *Servo) {
 }
 
 // Not implemented
-func (n *mockProto) Ping(ident uint8) error {
+func (n *mockProto) Ping(ident int) error {
 	return nil
-}
-
-// Not implemented
-func (n *mockProto) Logf(format string, v ...interface{}) {
-}
-
-// Not implemented
-func (n *mockProto) SetLogger(logger iface.Logger) {
 }
 
 func (n *mockProto) ReadData(ident int, addr int, count int) ([]byte, error) {

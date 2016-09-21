@@ -37,39 +37,37 @@ func New(serial io.ReadWriteCloser) *Network {
 // immediately available. Returns a slice containing the bytes read. If the
 // network timeout is reached, returns the bytes read so far (which might be
 // none) and an error.
-func (nw *Network) Read(n int) ([]byte, error) {
+func (nw *Network) Read(p []byte) (n int, err error) {
 	start := time.Now()
-	buf := make([]byte, n)
 	retry := 1 * time.Millisecond
-	m := 0
 
-	for m < n {
-		nn, err := nw.Serial.Read(buf[m:])
-		m += nn
+	for n < len(p) {
+		m, err := nw.Serial.Read(p[n:])
+		n += m
 
-		nw.Logf("~~ n=%d, m=%d, nn=%d, err=%s\n", n, m, nn, err)
+		nw.Logf("~~ n=%d, m=%d, err=%v\n", n, m, err)
 
 		// It's okay if we reached the end of the available bytes. They're
 		// probably just not available yet. Other errors are fatal.
 		if err != nil && err != io.EOF {
-			return buf, err
+			return m, err
 		}
 
 		// If the timeout has been exceeded, abort.
 		if time.Since(start) >= nw.Timeout {
-			return buf, fmt.Errorf("read timed out")
+			return n, fmt.Errorf("read timed out")
 		}
 
 		// If no bytes were read, back off exponentially. This is just to avoid
 		// flooding the network with retries if a servo isn't responding.
-		if nn == 0 {
+		if m == 0 {
 			time.Sleep(retry)
 			retry *= 2
 		}
 	}
 
-	nw.Logf("<< %#v\n", buf)
-	return buf, nil
+	nw.Logf("<< %#v\n", p)
+	return n, nil
 }
 
 func (nw *Network) Write(p []byte) (int, error) {
@@ -88,10 +86,6 @@ func (nw *Network) Flush() {
 			break
 		}
 	}
-}
-
-func (nw *Network) SetLogger(logger iface.Logger) {
-	nw.Logger = logger
 }
 
 // Logf writes a message to the network logger, unless it's nil.

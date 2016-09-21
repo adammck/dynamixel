@@ -41,7 +41,7 @@ func main() {
 
 	network := network.New(serial)
 	if *debug {
-		network.SetLogger(log.New(os.Stderr, "", log.LstdFlags))
+		network.Logger = log.New(os.Stderr, "", log.LstdFlags)
 	}
 
 	network.Flush()

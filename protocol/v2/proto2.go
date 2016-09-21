@@ -3,9 +3,9 @@ package v2
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"time"
 
-	"github.com/adammck/dynamixel/iface"
 	"github.com/adammck/dynamixel/network"
 )
 
@@ -30,11 +30,11 @@ const (
 )
 
 type Proto2 struct {
-	Network  iface.Networker
+	Network  io.ReadWriter
 	buffered bool
 }
 
-func New(network iface.Networker) *Proto2 {
+func New(network io.ReadWriter) *Proto2 {
 	return &Proto2{
 		Network:  network,
 		buffered: false,
@@ -93,8 +93,7 @@ func (p *Proto2) writeInstruction(ident int, instruction byte, params []byte) er
 	return nil
 }
 
-func (p *Proto2) readStatusPacket(expectIdent int) ([]byte, error) {
-	id := byte(expectIdent & 0xFF)
+func (p *Proto2) readStatusPacket(expID int) ([]byte, error) {
 
 	// +------+------+------+----------+----+-------+-------+-------------+-------+-------+-----+-------+-------+-------+
 	// | 0xFF | 0xFF | 0xFD |   0x00   | ID | LEN_L | LEN_H |    0x55     | Error |Param1 | ... |ParamN | CRL_L | CRL_H |
@@ -102,7 +101,10 @@ func (p *Proto2) readStatusPacket(expectIdent int) ([]byte, error) {
 	// |       Header       | Reserved | ID | Packet Length | Instruction | Error |      Parameter      |   16bit CRC   |
 	// +--------------------+----------+----+---------------+-------------+-------+---------------------+---------------+
 
-	buf, err := p.Network.Read(9)
+	// Read the first nine bytes (up to Error), which should always be present.
+
+	buf := make([]byte, 9)
+	_, err := p.Network.Read(buf)
 	if err != nil {
 		return nil, err
 	}
@@ -123,16 +125,16 @@ func (p *Proto2) readStatusPacket(expectIdent int) ([]byte, error) {
 		return nil, fmt.Errorf("bad status packet instruction: %x", buf[7])
 	}
 
-	resIdent := uint8(buf[4])
-	numParams := (int(buf[5]) | int(buf[6])<<8) - 4
-	errBits := buf[8]
+	actID := int(buf[4])
+	plen := (int(buf[5]) | int(buf[6])<<8) - 4
+	errByte := buf[8]
 
 	// Now read the params, if there are any. We must do this before checking
 	// for errors, to avoid leaving junk in the buffer.
 
-	pbuf := make([]byte, numParams)
-	if numParams > 0 {
-		pbuf, err = p.Network.Read(numParams)
+	pbuf := make([]byte, plen)
+	if plen > 0 {
+		_, err = p.Network.Read(pbuf)
 		if err != nil {
 			return nil, err
 		}
@@ -142,22 +144,23 @@ func (p *Proto2) readStatusPacket(expectIdent int) ([]byte, error) {
 	// TODO: Read this at the same time as the params.
 	// TODO: Check it!
 
-	buf, err = p.Network.Read(2)
+	buf = make([]byte, 2)
+	_, err = p.Network.Read(buf)
 	if err != nil {
 		return nil, err
 	}
 
 	// Return an error if the packet contained one.
 
-	if errBits != 0 {
-		return nil, decodeError(errBits)
+	if errByte != 0 {
+		return nil, decodeError(errByte)
 	}
 
 	// Return an error if we received a packet with the wrong ID. This indicates
 	// a concurrency issue (maybe clashing IDs on a single bus).
 
-	if resIdent != id {
-		return nil, fmt.Errorf("expected status packet for %v, but got %v", expectIdent, resIdent)
+	if actID != expID {
+		return nil, fmt.Errorf("expected status packet for %v, but got %v", expID, actID)
 	}
 
 	return pbuf, nil
@@ -230,13 +233,13 @@ func (p *Proto2) WriteData(ident int, addr int, params []byte, expectResponse bo
 	ps[1] = byte((addr >> 8) & 0xFF) // MSB
 	copy(ps[2:], params)
 
-	writeErr := p.writeInstruction(ident, instruction, ps)
-	if writeErr != nil {
-		return writeErr
+	err := p.writeInstruction(ident, instruction, ps)
+	if err != nil {
+		return err
 	}
 
 	if expectResponse {
-		_, err := p.readStatusPacket(ident)
+		_, err = p.readStatusPacket(ident)
 		if err != nil {
 			return err
 		}
