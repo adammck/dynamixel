@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/adammck/dynamixel/iface"
-	network1 "github.com/adammck/dynamixel/protocol/v1"
-	network2 "github.com/adammck/dynamixel/protocol/v2"
+	"github.com/adammck/dynamixel/network"
+	p1 "github.com/adammck/dynamixel/protocol/v1"
+	p2 "github.com/adammck/dynamixel/protocol/v2"
 	"github.com/adammck/dynamixel/servo"
 	"github.com/adammck/dynamixel/servo/ax"
 	"github.com/adammck/dynamixel/servo/xl"
@@ -42,17 +43,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	var nw iface.Protocol
+	network := network.New(serial)
+	if *debug {
+		network.SetLogger(log.New(os.Stderr, "", log.LstdFlags))
+	}
+
+	network.Flush()
+
+	var proto iface.Protocol
 	var servo *servo.Servo
 
 	switch *model {
 	case "ax":
-		nw = network1.New(serial)
-		servo, err = ax.New(nw, *servoId)
+		proto = p1.New(network)
+		servo, err = ax.New(proto, *servoId)
 
 	case "xl":
-		nw = network2.New(serial)
-		servo, err = xl.New(nw, *servoId)
+		proto = p2.New(network)
+		servo, err = xl.New(proto, *servoId)
 
 	default:
 		fmt.Printf("unsupported servo model: %s\n", *model)
@@ -61,10 +69,6 @@ func main() {
 	if err != nil {
 		fmt.Printf("servo init error: %s\n", err)
 		os.Exit(1)
-	}
-
-	if *debug {
-		nw.SetLogger(log.New(os.Stderr, "", log.LstdFlags))
 	}
 
 	err = servo.Ping()

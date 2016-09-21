@@ -211,5 +211,5 @@ func (servo *Servo) setRegister(n reg.RegName, value int) error {
 // nil if the ping succeeds, otherwise an error. It's optional, but a very good
 // idea, to call this before sending any other instructions to the servo.
 func (servo *Servo) Ping() error {
-	return servo.Protocol.Ping(uint8(servo.ID))
+	return servo.Protocol.Ping(servo.ID)
 }

@@ -3,9 +3,6 @@ package v1
 import (
 	"bytes"
 	"fmt"
-	"io"
-	"strings"
-	"time"
 
 	"github.com/adammck/dynamixel/iface"
 	"github.com/adammck/dynamixel/utils"
@@ -27,24 +24,15 @@ const (
 )
 
 type Proto1 struct {
-	Serial io.ReadWriteCloser
-
-	// The time to wait for a single read to complete before giving up.
-	Timeout time.Duration
-
-	// Optional Logger (which only implements Printf) to log network traffic. If
-	// nil (the default), nothing is logged.
-	Logger iface.Logger
+	Network iface.Networker
 
 	// Whether the network is currently in bufferred write mode.
 	buffered bool
 }
 
-func New(serial io.ReadWriteCloser) *Proto1 {
+func New(network iface.Networker) *Proto1 {
 	return &Proto1{
-		Serial:   serial,
-		Timeout:  128 * time.Millisecond,
-		Logger:   nil,
+		Network:  network,
 		buffered: false,
 	}
 }
@@ -55,55 +43,8 @@ func New(serial io.ReadWriteCloser) *Proto1 {
 // they'll all be executed at once.
 //
 // This is very useful for synchronizing the movements of multiple servos.
-func (n *Proto1) SetBuffered(buffered bool) {
-	n.buffered = buffered
-}
-
-func (n *Proto1) SetLogger(logger iface.Logger) {
-	n.Logger = logger
-}
-
-// DecodeStartusError Converts an error byte (as included in a status packet)
-// into an error object with a friendly error message. We can't be too specific
-// about it, because any combination of errors might occur at the same time.
-//
-// See: http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm#Status_Packet
-func DecodeStatusError(errBits byte) error {
-	str := []string{}
-
-	if errBits&1 == 1 {
-		str = append(str, "input voltage")
-	}
-
-	if errBits&2 == 2 {
-		str = append(str, "angle limit")
-	}
-
-	if errBits&4 == 4 {
-		str = append(str, "overheating")
-	}
-
-	if errBits&8 == 8 {
-		str = append(str, "range")
-	}
-
-	if errBits&16 == 16 {
-		str = append(str, "checksum")
-	}
-
-	if errBits&32 == 32 {
-		str = append(str, "overload")
-	}
-
-	if errBits&64 == 64 {
-		str = append(str, "instruction")
-	}
-
-	if errBits&128 == 128 {
-		str = append(str, "unknown")
-	}
-
-	return fmt.Errorf("status error(s): %s", strings.Join(str, ", "))
+func (p *Proto1) SetBuffered(buffered bool) {
+	p.buffered = buffered
 }
 
 // This stuff is generic to all Dynamixels. See:
@@ -111,7 +52,7 @@ func DecodeStatusError(errBits byte) error {
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_packet.htm
 // * http://support.robotis.com/en/product/dynamixel/communication/dxl_instruction.htm
 
-func (n *Proto1) WriteInstruction(ident byte, instruction byte, params ...byte) error {
+func (p *Proto1) writeInstruction(ident byte, instruction byte, params ...byte) error {
 	buf := new(bytes.Buffer)
 	paramsLength := byte(len(params) + 2)
 
@@ -138,10 +79,7 @@ func (n *Proto1) WriteInstruction(ident byte, instruction byte, params ...byte) 
 	buf.WriteByte(byte((^sum) & 0xFF))
 
 	// write to port
-
-	n.Logf(">> %#v\n", buf.Bytes())
-	_, err := buf.WriteTo(n.Serial)
-
+	_, err := buf.WriteTo(p.Network)
 	if err != nil {
 		return err
 	}
@@ -149,43 +87,7 @@ func (n *Proto1) WriteInstruction(ident byte, instruction byte, params ...byte) 
 	return nil
 }
 
-// read receives the next n bytes from the network, blocking if they're not
-// immediately available. Returns a slice containing the bytes read. If the
-// network timeout is reached, returns the bytes read so far (which might be
-// none) and an error.
-func (n *Proto1) read(count int) ([]byte, error) {
-	start := time.Now()
-	buf := make([]byte, count)
-	retry := 1 * time.Millisecond
-	m := 0
-
-	for m < count {
-		nn, err := n.Serial.Read(buf[m:])
-		m += nn
-
-		// It's okay if we reached the end of the available bytes. They're
-		// probably just not available yet. Other errors are fatal.
-		if err != nil && err != io.EOF {
-			return buf, err
-		}
-
-		// If the timeout has been exceeded, abort.
-		if time.Since(start) >= n.Timeout {
-			return buf, fmt.Errorf("read timed out")
-		}
-
-		// If no bytes were read, back off exponentially. This is just to avoid
-		// flooding the network with retries if a servo isn't responding.
-		if nn == 0 {
-			time.Sleep(retry)
-			retry *= 2
-		}
-	}
-
-	return buf, nil
-}
-
-func (n *Proto1) ReadStatusPacket(expectIdent byte) ([]byte, error) {
+func (p *Proto1) readStatusPacket(expectIdent byte) ([]byte, error) {
 
 	//
 	// Status packets are similar to instruction packet:
@@ -205,8 +107,7 @@ func (n *Proto1) ReadStatusPacket(expectIdent byte) ([]byte, error) {
 	// packet refers to. But sometimes, the third byte is another 0xFF. I don't
 	// know why, and I can't seem to find any useful information on the matter.
 
-	headerBuf, headerErr := n.read(3)
-	n.Logf("<< %#v (header, ident)\n", headerBuf)
+	headerBuf, headerErr := p.Network.Read(3)
 	if headerErr != nil {
 		return []byte{}, headerErr
 	}
@@ -221,8 +122,7 @@ func (n *Proto1) ReadStatusPacket(expectIdent byte) ([]byte, error) {
 	resIdent := headerBuf[2]
 	if resIdent == 255 {
 
-		identBuf, identErr := n.read(1)
-		n.Logf("<< %#v (ident retry)\n", identBuf)
+		identBuf, identErr := p.Network.Read(1)
 		if identErr != nil {
 			return []byte{}, identErr
 		}
@@ -232,8 +132,7 @@ func (n *Proto1) ReadStatusPacket(expectIdent byte) ([]byte, error) {
 
 	// The next two bytes are always present, so just read them.
 
-	paramCountAndErrBitsBuf, pcebErr := n.read(2)
-	n.Logf("<< %#v (p+2, errbits)\n", paramCountAndErrBitsBuf)
+	paramCountAndErrBitsBuf, pcebErr := p.Network.Read(2)
 	if pcebErr != nil {
 		return []byte{}, pcebErr
 	}
@@ -247,8 +146,7 @@ func (n *Proto1) ReadStatusPacket(expectIdent byte) ([]byte, error) {
 
 	if numParams > 0 {
 		var paramsErr error
-		paramsBuf, paramsErr = n.read(int(numParams))
-		n.Logf("<< %#v (params)\n", paramsBuf)
+		paramsBuf, paramsErr = p.Network.Read(int(numParams))
 		if paramsErr != nil {
 			return []byte{}, paramsErr
 		}
@@ -257,9 +155,7 @@ func (n *Proto1) ReadStatusPacket(expectIdent byte) ([]byte, error) {
 	// read the checksum, which is always one byte
 	// TODO: check the checksum
 
-	checksumBuf, checksumErr := n.read(1)
-
-	n.Logf("<< %#v (checksum)\n", checksumBuf)
+	_, checksumErr := p.Network.Read(1)
 	if checksumErr != nil {
 		return []byte{}, checksumErr
 	}
@@ -267,7 +163,7 @@ func (n *Proto1) ReadStatusPacket(expectIdent byte) ([]byte, error) {
 	// return an error if the packet contained one.
 
 	if errBits != 0x0 {
-		return []byte{}, DecodeStatusError(errBits)
+		return []byte{}, decodeError(errBits)
 	}
 
 	// return an error if we received a packet with the wrong ID. this indicates
@@ -284,17 +180,17 @@ func (n *Proto1) ReadStatusPacket(expectIdent byte) ([]byte, error) {
 
 // Ping sends the PING instruction to the given Servo ID, and waits for the
 // response. Returns an error if the ping fails, or nil if it succeeds.
-func (n *Proto1) Ping(ident byte) error {
-	n.Logf("Ping(%d)", ident)
+func (p *Proto1) Ping(ident int) error {
+	ib := utils.Low(ident)
 
-	writeErr := n.WriteInstruction(ident, Ping)
+	writeErr := p.writeInstruction(ib, Ping)
 	if writeErr != nil {
 		return writeErr
 	}
 
 	// There's no way to disable the status packet for PING commands, so always
 	// wait for it. That's how we know that the servo is responding.
-	_, readErr := n.ReadStatusPacket(ident)
+	_, readErr := p.readStatusPacket(ib)
 	if readErr != nil {
 		return readErr
 	}
@@ -305,7 +201,7 @@ func (n *Proto1) Ping(ident byte) error {
 // ReadData reads a slice of count bytes from the control table of the given
 // servo ID. Use the bytesToInt function to convert the output to something more
 // useful.
-func (n *Proto1) ReadData(ident int, addr int, count int) ([]byte, error) {
+func (p *Proto1) ReadData(ident int, addr int, count int) ([]byte, error) {
 	ib := utils.Low(ident)
 
 	params := []byte{
@@ -313,12 +209,12 @@ func (n *Proto1) ReadData(ident int, addr int, count int) ([]byte, error) {
 		byte(count),
 	}
 
-	err := n.WriteInstruction(ib, ReadData, params...)
+	err := p.writeInstruction(ib, ReadData, params...)
 	if err != nil {
 		return []byte{}, err
 	}
 
-	buf, err := n.ReadStatusPacket(ib)
+	buf, err := p.readStatusPacket(ib)
 	if err != nil {
 		return buf, err
 	}
@@ -326,29 +222,29 @@ func (n *Proto1) ReadData(ident int, addr int, count int) ([]byte, error) {
 	return buf, nil
 }
 
-func (n *Proto1) WriteData(ident int, address int, data []byte, expectStausPacket bool) error {
+func (p *Proto1) WriteData(ident int, address int, data []byte, expectResponse bool) error {
 	ib := utils.Low(ident)
 
 	var instruction byte
 
-	if n.buffered {
+	if p.buffered {
 		instruction = RegWrite
 	} else {
 		instruction = WriteData
 	}
 
 	// Params is dest address followed by the data.
-	p := make([]byte, len(data)+1)
-	p[0] = utils.Low(address)
-	copy(p[1:], data)
+	ps := make([]byte, len(data)+1)
+	ps[0] = utils.Low(address)
+	copy(ps[1:], data)
 
-	writeErr := n.WriteInstruction(ib, instruction, p...)
+	writeErr := p.writeInstruction(ib, instruction, ps...)
 	if writeErr != nil {
 		return writeErr
 	}
 
-	if expectStausPacket {
-		_, readErr := n.ReadStatusPacket(ib)
+	if expectResponse {
+		_, readErr := p.readStatusPacket(ib)
 		if readErr != nil {
 			return readErr
 		}
@@ -360,13 +256,6 @@ func (n *Proto1) WriteData(ident int, address int, data []byte, expectStausPacke
 // Action broadcasts the ACTION instruction, which initiates any previously
 // bufferred instructions. Doesn't wait for a status packet in response, because
 // they are not sent in response to broadcast instructions.
-func (n *Proto1) Action() error {
-	return n.WriteInstruction(BroadcastIdent, Action)
-}
-
-// Logf writes a message to the network logger, unless it's nil.
-func (n *Proto1) Logf(format string, v ...interface{}) {
-	if n.Logger != nil {
-		n.Logger.Printf(format, v)
-	}
+func (p *Proto1) Action() error {
+	return p.writeInstruction(BroadcastIdent, Action)
 }
