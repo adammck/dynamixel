@@ -7,10 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/adammck/dynamixel/iface"
 	"github.com/adammck/dynamixel/network"
-	p1 "github.com/adammck/dynamixel/protocol/v1"
-	p2 "github.com/adammck/dynamixel/protocol/v2"
 	"github.com/adammck/dynamixel/servo"
 	"github.com/adammck/dynamixel/servo/ax"
 	"github.com/adammck/dynamixel/servo/xl"
@@ -50,17 +47,13 @@ func main() {
 
 	network.Flush()
 
-	var proto iface.Protocol
 	var servo *servo.Servo
-
 	switch *model {
 	case "ax":
-		proto = p1.New(network)
-		servo, err = ax.New(proto, *servoID)
+		servo, err = ax.New(network, *servoID)
 
 	case "xl":
-		proto = p2.New(network)
-		servo, err = xl.New(proto, *servoID)
+		servo, err = xl.New(network, *servoID)
 
 	default:
 		fmt.Printf("unsupported servo model: %s\n", *model)

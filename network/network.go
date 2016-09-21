@@ -77,30 +77,6 @@ func (nw *Network) Write(p []byte) (int, error) {
 	return nw.Serial.Write(p)
 }
 
-// Ping sends the PING instruction to the given Servo ID, and waits for the
-// response. Returns an error if the ping fails, or nil if it succeeds.
-func (nw *Network) Ping(ident uint8) error {
-	return nil
-}
-
-// ReadData reads a slice of n bytes from the control table of the given servo
-// ID. Use the bytesToInt function to convert the output to something more
-// useful.
-func (nw *Network) ReadData(ident int, addr int, count int) ([]byte, error) {
-	return nil, nil
-}
-
-func (nw *Network) WriteData(ident int, addr int, params []byte, expectStausPacket bool) error {
-	return nil
-}
-
-// Action broadcasts the ACTION instruction, which initiates any previously
-// bufferred instructions. Doesn't wait for a status packet in response, because
-// they are not sent in response to broadcast instructions.
-func (nw *Network) Action() error {
-	return nil
-}
-
 func (nw *Network) Flush() {
 	buf := make([]byte, 128)
 	var n int

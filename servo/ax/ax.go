@@ -2,14 +2,15 @@ package ax
 
 import (
 	"github.com/adammck/dynamixel/iface"
+	"github.com/adammck/dynamixel/protocol/v1"
 	reg "github.com/adammck/dynamixel/registers"
 	"github.com/adammck/dynamixel/servo"
 )
 
 // New returns a new AX-series servo with the given ID.
 // See: http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm
-func New(n iface.Protocol, ID int) (*servo.Servo, error) {
-	return servo.New(n, Registers, ID), nil
+func New(n iface.Networker, ID int) (*servo.Servo, error) {
+	return servo.New(v1.New(n), Registers, ID), nil
 }
 
 var Registers reg.Map
