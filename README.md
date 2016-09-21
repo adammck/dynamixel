@@ -1,8 +1,11 @@
 # Dynamixel
 
-This packages provides a Go interface to Dynamixel servos. It's only tested
-against AX-12A servos (because I am a cheapskate), but should work for similar
-models using the Communication 1.0 protocol.
+[![Build Status](https://travis-ci.org/adammck/dynamixel.svg?branch=master)](https://travis-ci.org/adammck/dynamixel)
+[![GoDoc](https://godoc.org/github.com/adammck/dynamixel?status.svg)](https://godoc.org/github.com/adammck/dynamixel)
+
+This packages provides a Go interface to Dynamixel servos. It's tested against
+AX-12A and XL-320 servos (because I am a cheapskate), but should work with other
+models.
 
 
 ## Example
@@ -13,7 +16,7 @@ package main
 import (
   "log"
   "github.com/jacobsa/go-serial/serial"
-  network "github.com/adammck/dynamixel/protocol/v1"
+  "github.com/adammck/dynamixel/network"
   "github.com/adammck/dynamixel/servo/ax"
 )
 
@@ -56,7 +59,7 @@ More examples can be found in the [examples] [examples] directory of this repo.
 ## Documentation
 
 The docs can be found at [godoc.org] [docs], as usual.  
-The API is based on the Dynamixel [AX protocol] [proto] docs.
+The API is based on the Dynamixel [v1 protocol] [proto] docs.
 
 
 ## License
