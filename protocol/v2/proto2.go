@@ -167,13 +167,16 @@ func (p *Proto2) readStatusPacket(expectIdent int) ([]byte, error) {
 // response. Returns an error if the ping fails, or nil if it succeeds.
 func (p *Proto2) Ping(ident int) error {
 
-	// HACK: Ping responses can take forever on XL-320s, but we don't want to raise the timeout for everything.
-	nw := p.Network.(*network.Network)
-	ot := nw.Timeout
-	nw.Timeout = 2 * time.Second
-	defer func() {
-		nw.Timeout = ot
-	}()
+	// HACK: Ping responses can take forever on XL-320s, but we don't want to
+	//       raise the timeout for everything.
+	nw, ok := p.Network.(*network.Network)
+	if ok {
+		ot := nw.Timeout
+		nw.Timeout = 2 * time.Second
+		defer func() {
+			nw.Timeout = ot
+		}()
+	}
 
 	err := p.writeInstruction(ident, Ping, nil)
 	if err != nil {
