@@ -1,6 +1,7 @@
 # Dynamixel
 
 [![Build Status](https://travis-ci.org/adammck/dynamixel.svg?branch=master)](https://travis-ci.org/adammck/dynamixel)
+[![Go Report Card](https://goreportcard.com/badge/github.com/adammck/dynamixel)](https://goreportcard.com/report/github.com/adammck/dynamixel)
 [![GoDoc](https://godoc.org/github.com/adammck/dynamixel?status.svg)](https://godoc.org/github.com/adammck/dynamixel)
 
 This packages provides a Go interface to Dynamixel servos. It's tested against
