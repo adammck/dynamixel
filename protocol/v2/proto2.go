@@ -104,9 +104,12 @@ func (p *Proto2) readStatusPacket(expID int) ([]byte, error) {
 	// Read the first nine bytes (up to Error), which should always be present.
 
 	buf := make([]byte, 9)
-	_, err := p.Network.Read(buf)
+	n, err := p.Network.Read(buf)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading packet header: %s", err)
+	}
+	if n != 9 {
+		return nil, fmt.Errorf("reading packet header: expected %d bytes, got %d", 9, n)
 	}
 
 	// Check that this is a valid-looking packet, and that it's a status
@@ -118,11 +121,11 @@ func (p *Proto2) readStatusPacket(expID int) ([]byte, error) {
 	// of the spec. It's probably (?) zero, but might change in future.
 
 	if buf[0] != 0xFF || buf[1] != 0xFF || buf[2] != 0xFD {
-		return nil, fmt.Errorf("bad status packet header: %x", buf[0:2])
+		return nil, fmt.Errorf("bad status packet header: 0x%02X 0x%02X 0x%02X", buf[0], buf[1], buf[2])
 	}
 
 	if buf[7] != Status {
-		return nil, fmt.Errorf("bad status packet instruction: %x", buf[7])
+		return nil, fmt.Errorf("bad status packet instruction: 0x%02X", buf[7])
 	}
 
 	actID := int(buf[4])
@@ -132,11 +135,12 @@ func (p *Proto2) readStatusPacket(expID int) ([]byte, error) {
 	// Now read the params, if there are any. We must do this before checking
 	// for errors, to avoid leaving junk in the buffer.
 
-	pbuf := make([]byte, plen)
+	var pbuf []byte
 	if plen > 0 {
+		pbuf = make([]byte, plen)
 		_, err = p.Network.Read(pbuf)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("reading %d params: %s", plen, err)
 		}
 	}
 
@@ -145,9 +149,12 @@ func (p *Proto2) readStatusPacket(expID int) ([]byte, error) {
 	// TODO: Check it!
 
 	buf = make([]byte, 2)
-	_, err = p.Network.Read(buf)
+	n, err = p.Network.Read(buf)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("reading checksum: %s", err)
+	}
+	if n != 2 {
+		return nil, fmt.Errorf("reading checksum: expected %d bytes, got %d", 2, n)
 	}
 
 	// Return an error if the packet contained one.
@@ -220,7 +227,7 @@ func (p *Proto2) ReadData(ident int, addr int, n int) ([]byte, error) {
 	return buf, nil
 }
 
-func (p *Proto2) WriteData(ident int, addr int, params []byte, expectResponse bool) error {
+func (p *Proto2) WriteData(ident int, addr int, data []byte, expectResponse bool) error {
 	var instruction byte
 	if p.buffered {
 		instruction = RegWrite
@@ -228,10 +235,10 @@ func (p *Proto2) WriteData(ident int, addr int, params []byte, expectResponse bo
 		instruction = WriteData
 	}
 
-	ps := make([]byte, len(params)+2)
+	ps := make([]byte, len(data)+2)
 	ps[0] = byte(addr & 0xFF)        // LSB
 	ps[1] = byte((addr >> 8) & 0xFF) // MSB
-	copy(ps[2:], params)
+	copy(ps[2:], data)
 
 	err := p.writeInstruction(ident, instruction, ps)
 	if err != nil {

@@ -13,6 +13,10 @@ import (
 func decodeError(b byte) error {
 	str := []string{}
 
+	if b == 0 {
+		return fmt.Errorf("no error")
+	}
+
 	if b&1 == 1 {
 		str = append(str, "input voltage")
 	}
@@ -45,5 +49,10 @@ func decodeError(b byte) error {
 		str = append(str, "unknown")
 	}
 
-	return fmt.Errorf("status error(s): %s", strings.Join(str, ", "))
+	s := ""
+	if len(str) > 1 {
+		s = "s"
+	}
+
+	return fmt.Errorf("status error%s: %s", s, strings.Join(str, ", "))
 }

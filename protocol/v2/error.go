@@ -9,6 +9,9 @@ func decodeError(b byte) error {
 	s := ""
 
 	switch b {
+	case 0x00:
+		s = "no error"
+
 	case 0x01:
 		s = "result fail"
 
@@ -31,7 +34,7 @@ func decodeError(b byte) error {
 		s = "access error"
 
 	default:
-		s = fmt.Sprintf("unknown error: 0x%X", b)
+		s = fmt.Sprintf("unknown error: 0x%02X", b)
 	}
 
 	return errors.New(s)
