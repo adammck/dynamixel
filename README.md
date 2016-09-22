@@ -5,8 +5,8 @@
 [![GoDoc](https://godoc.org/github.com/adammck/dynamixel?status.svg)](https://godoc.org/github.com/adammck/dynamixel)
 
 This packages provides a Go interface to Dynamixel servos. It's tested against
-AX-12A and XL-320 servos (because I am a cheapskate), but should work with other
-models.
+[AX-12] [ax] and [XL-320] [xl] servos (because I am a cheapskate), but should
+work with other models.
 
 
 ## Example
@@ -75,6 +75,8 @@ The API is based on the Dynamixel [v1 protocol] [proto] docs.
 
 
 
+[ax]:       http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm
+[xl]:       http://support.robotis.com/en/product/dynamixel/xl-series/xl-320.htm
 [docs]:     https://godoc.org/github.com/adammck/dynamixel
 [examples]: https://github.com/adammck/dynamixel/tree/master/examples
 [proto]:    http://support.robotis.com/en/product/dynamixel/ax_series/dxl_ax_actuator.htm#Control_Table
