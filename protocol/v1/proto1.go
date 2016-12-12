@@ -146,7 +146,7 @@ func (p *Proto1) readStatusPacket(expID int) ([]byte, error) {
 	// for errors, to avoid leaving junk in the buffer.
 
 	if plen > 0 {
-		pbuf := make([]byte, int(plen))
+		pbuf = make([]byte, int(plen))
 		_, err = p.Network.Read(pbuf)
 		if err != nil {
 			return []byte{}, err
