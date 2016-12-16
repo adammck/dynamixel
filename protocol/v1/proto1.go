@@ -24,25 +24,17 @@ const (
 )
 
 type Proto1 struct {
-	Network  io.ReadWriter
-	buffered bool
+	Network io.ReadWriter
 }
 
 func New(network io.ReadWriter) *Proto1 {
 	return &Proto1{
-		Network:  network,
-		buffered: false,
+		Network: network,
 	}
 }
 
-// SetBuffered puts the network in bufferred write mode, which means that the
-// REG_WRITE instruction will be used, rather than WRITE_DATA. This causes calls
-// to WriteData to be bufferred until the Action method is called, at which time
-// they'll all be executed at once.
-//
-// This is very useful for synchronizing the movements of multiple servos.
 func (p *Proto1) SetBuffered(buffered bool) {
-	p.buffered = buffered
+	panic("removed: Proto1.SetBuffered (use Servo.SetBuffered)")
 }
 
 // This stuff is generic to all Dynamixels. See:
@@ -221,12 +213,14 @@ func (p *Proto1) ReadData(ident int, addr int, count int) ([]byte, error) {
 }
 
 func (p *Proto1) WriteData(ident int, address int, data []byte, expectResponse bool) error {
-	var instruction byte
-	if p.buffered {
-		instruction = RegWrite
-	} else {
-		instruction = WriteData
-	}
+	return p.write(ident, WriteData, address, data, expectResponse)
+}
+
+func (p *Proto1) RegWrite(ident int, address int, data []byte, expectResponse bool) error {
+	return p.write(ident, RegWrite, address, data, expectResponse)
+}
+
+func (p *Proto1) write(ident int, instruction byte, address int, data []byte, expectResponse bool) error {
 
 	// Params is dest address followed by the data.
 	ps := make([]byte, len(data)+1)

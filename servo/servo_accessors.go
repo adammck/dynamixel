@@ -220,6 +220,10 @@ func (s *Servo) MovingSpeed() (int, error) {
 }
 
 // SetMovingSpeed the moving speed.
+//
+// Note: Setting the moving speed appears to reset the TorqueEnabled register to
+//       true, at least on my AX12s.
+//
 func (s *Servo) SetMovingSpeed(speed int) error {
 	return s.setRegister(reg.MovingSpeed, speed)
 }

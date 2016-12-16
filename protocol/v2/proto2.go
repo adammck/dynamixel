@@ -30,25 +30,17 @@ const (
 )
 
 type Proto2 struct {
-	Network  io.ReadWriter
-	buffered bool
+	Network io.ReadWriter
 }
 
 func New(network io.ReadWriter) *Proto2 {
 	return &Proto2{
-		Network:  network,
-		buffered: false,
+		Network: network,
 	}
 }
 
-// SetBuffered puts the network in bufferred write mode, which means that the
-// REG_WRITE instruction will be used, rather than WRITE_DATA. This causes calls
-// to WriteData to be bufferred until the Action method is called, at which time
-// they'll all be executed at once.
-//
-// This is very useful for synchronizing the movements of multiple servos.
 func (p *Proto2) SetBuffered(buffered bool) {
-	p.buffered = buffered
+	panic("removed: Proto2.SetBuffered (use Servo.SetBuffered)")
 }
 
 // See:
@@ -227,14 +219,15 @@ func (p *Proto2) ReadData(ident int, addr int, n int) ([]byte, error) {
 	return buf, nil
 }
 
-func (p *Proto2) WriteData(ident int, addr int, data []byte, expectResponse bool) error {
-	var instruction byte
-	if p.buffered {
-		instruction = RegWrite
-	} else {
-		instruction = WriteData
-	}
+func (p *Proto2) WriteData(ident int, address int, data []byte, expectResponse bool) error {
+	return p.write(ident, WriteData, address, data, expectResponse)
+}
 
+func (p *Proto2) RegWrite(ident int, address int, data []byte, expectResponse bool) error {
+	return p.write(ident, RegWrite, address, data, expectResponse)
+}
+
+func (p *Proto2) write(ident int, instruction byte, addr int, data []byte, expectResponse bool) error {
 	ps := make([]byte, len(data)+2)
 	ps[0] = byte(addr & 0xFF)        // LSB
 	ps[1] = byte((addr >> 8) & 0xFF) // MSB

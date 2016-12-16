@@ -29,6 +29,12 @@ type Servo struct {
 	// (unfortunately) varies between models, so can't be const.
 	registers reg.Map
 
+	// If true, registers are set via the RegWrite instruction rather than (the
+	// default) WriteData. This allows instructions to many servos to be issued,
+	// then triggered together via the Action instruction. This is especially
+	// useful for synchronizing the movements of multiple servos.
+	buffered bool
+
 	// TODO: Remove this!
 	zeroAngle float64
 }
@@ -51,6 +57,13 @@ func NewWithReturnLevel(proto iface.Protocol, registers reg.Map, ID int, returnL
 	s.returnLevelValue = returnLevel
 	s.returnLevelKnown = true
 	return s
+}
+
+// Enable instruction buffering, which causes register accessors to send the
+// REG_WRITE instruction instead of WRITE_DATA. This causes writes to be
+// buffered until the ACTION instruction is received (via Protocol.Action).
+func (s *Servo) SetBuffered(buf bool) {
+	s.buffered = buf
 }
 
 // SetReturnLevel sets the return level. Possible values are:
@@ -162,7 +175,8 @@ func (s *Servo) getRegister(n reg.RegName) (int, error) {
 		return 0, fmt.Errorf("expected %d bytes, got %d", r.Length, len(b))
 	}
 
-	return utils.BytesToInt(b)
+	out, err := utils.BytesToInt(b)
+	return out, err
 }
 
 // setRegister writes a value to the given register. Returns an error if the
@@ -185,6 +199,20 @@ func (s *Servo) setRegister(n reg.RegName, value int) error {
 		return fmt.Errorf("value too high: %d (max=%d)", value, r.Max)
 	}
 
+	// Pass the appropriate number of params based on the register, not value.
+	// (We've already checked that the value is in range, above.)
+	var params []byte
+	switch r.Length {
+	case 1:
+		params = []byte{utils.Low(value)}
+
+	case 2:
+		params = []byte{utils.Low(value), utils.High(value)}
+
+	default:
+		return fmt.Errorf("invalid register length: %d", r.Length)
+	}
+
 	// Refuse to write if we don't know the return level, because we can't know
 	// whether to wait for a status packet or not.
 	rl, err := s.ReturnLevel()
@@ -192,19 +220,21 @@ func (s *Servo) setRegister(n reg.RegName, value int) error {
 		return err
 	}
 
+	// Only expect a response when the ReturnLevel is max. This is the same for
+	// all models-- hope that doesn't change!
+	expRes := (rl == 2)
+
+	//
 	// TODO: Add log message when setting a register.
-	switch r.Length {
-	case 1:
-		err = s.Protocol.WriteData(s.ID, int(r.Address), []byte{utils.Low(value)}, (rl == 2))
-
-	case 2:
-		err = s.Protocol.WriteData(s.ID, int(r.Address), []byte{utils.Low(value), utils.High(value)}, (rl == 2))
-
-	default:
-		err = fmt.Errorf("invalid register length: %d", r.Length)
+	//
+	// TODO: If this is the only place we call RegWrite/WriteData, maybe
+	//       conditionally wait for the response here rather than in the proto.
+	//
+	if s.buffered {
+		return s.Protocol.RegWrite(s.ID, int(r.Address), params, expRes)
 	}
 
-	return err
+	return s.Protocol.WriteData(s.ID, int(r.Address), params, expRes)
 }
 
 // Ping sends the PING instruction to servo, and waits for the response. Returns

@@ -23,17 +23,17 @@ func TestGetRegister(t *testing.T) {
 		invalidLength: &reg.Register{Address: 0x03, Length: 3, Max: 1},
 	}
 
-	n, servo := servo(m, map[int]byte{})
+	p, servo := servo(m, map[int]byte{})
 
 	// read one byte
-	n.controlTable[m[roOneByte].Address] = 0x10
+	p.controlTable[m[roOneByte].Address] = 0x10
 	r, err := servo.getRegister(roOneByte)
 	assert.Nil(t, err)
 	assert.Equal(t, 0x10, r)
 
 	// read two bytes
-	n.controlTable[m[roTwoByte].Address] = 0x10
-	n.controlTable[m[roTwoByte].Address+1] = 0x20
+	p.controlTable[m[roTwoByte].Address] = 0x10
+	p.controlTable[m[roTwoByte].Address+1] = 0x20
 	r, err = servo.getRegister(roTwoByte)
 	assert.Nil(t, err)
 	assert.Equal(t, 0x2010, r) // 0x10(L) | 0x20(H)<<8
@@ -56,33 +56,54 @@ func TestSetRegister(t *testing.T) {
 		rwTwoByte: &reg.Register{Address: 0x02, Length: 2, Access: reg.RW, Min: 0, Max: 2048},
 	}
 
-	n, servo := servo(m, map[int]byte{})
+	p, servo := servo(m, map[int]byte{})
 
 	// read-only register can't be set
 	err := servo.setRegister(roOneByte, 1)
-	assert.Equal(t, byte(0), n.controlTable[0])
+	assert.Equal(t, byte(0), p.controlTable[0])
 	assert.Error(t, err)
 
 	// read/write single byte
 	err = servo.setRegister(rwOneByte, 2)
 	assert.NoError(t, err)
-	assert.Equal(t, byte(2), n.controlTable[1], "control table should have been written")
+	assert.Equal(t, byte(2), p.controlTable[1], "control table should have been written")
 
 	// read/write two bytes
 	err = servo.setRegister(rwTwoByte, 1025)
 	assert.NoError(t, err)
-	assert.Equal(t, byte(0x01), n.controlTable[2], "low byte of control table should have been written")
-	assert.Equal(t, byte(0x04), n.controlTable[3], "high byte of control table should have been written")
+	assert.Equal(t, byte(0x01), p.controlTable[2], "low byte of control table should have been written")
+	assert.Equal(t, byte(0x04), p.controlTable[3], "high byte of control table should have been written")
 
 	// write too-low value with one byte
 	err = servo.setRegister(rwOneByte, 1)
 	assert.EqualError(t, err, "value too low: 1 (min=2)")
-	assert.Equal(t, byte(0x00), n.controlTable[4], "control table should NOT have been written")
+	assert.Equal(t, byte(0x00), p.controlTable[4], "control table should NOT have been written")
 
 	// write too-high value with one byte
 	err = servo.setRegister(rwOneByte, 4)
 	assert.EqualError(t, err, "value too high: 4 (max=3)")
-	assert.Equal(t, byte(0x00), n.controlTable[5], "control table should NOT have been written")
+	assert.Equal(t, byte(0x00), p.controlTable[5], "control table should NOT have been written")
+}
+
+func TestSetSetBuffered(t *testing.T) {
+	m := reg.Map{
+		rwOneByte: &reg.Register{Address: 0x01, Length: 1, Access: reg.RW, Min: 0, Max: 1},
+	}
+
+	// Fake servo in buffered mode
+	p, servo := servo(m, map[int]byte{})
+	servo.SetBuffered(true)
+
+	err := servo.setRegister(rwOneByte, 1)
+	assert.NoError(t, err)
+
+	// Ensure that WriteData was not called
+	assert.Equal(t, byte(0), p.controlTable[0x01], "control table should not have been written")
+
+	// Ensure that RegWrite was called with the correct params
+	if assert.Len(t, p.writeBuf, 1, "write buffer should have 1 element") {
+		assert.Equal(t, writeEvent{0x01, []byte{1}}, p.writeBuf[0])
+	}
 }
 
 func TestVoltage(t *testing.T) {
@@ -111,10 +132,16 @@ func TestVoltage(t *testing.T) {
 
 // -----------------------------------------------------------------------------
 
+type writeEvent struct {
+	addr int
+	data []byte
+}
+
 // MockNetwork provides a fake servo, with a control table which can be read
 // from and written to like a real servo.
 type mockProto struct {
 	controlTable [50]byte
+	writeBuf     []writeEvent
 }
 
 // servo returns a real Servo backed by a mock network, where the control table
@@ -136,35 +163,50 @@ func servo(r reg.Map, b map[int]byte) (*mockProto, *Servo) {
 	}
 
 	// Pre-configure servo as #1, in verbose mode.
-	n := &mockProto{}
-	n.controlTable[m[reg.ServoID].Address] = byte(1)
-	n.controlTable[m[reg.StatusReturnLevel].Address] = byte(2)
+	p := &mockProto{}
+	p.controlTable[m[reg.ServoID].Address] = byte(1)
+	p.controlTable[m[reg.StatusReturnLevel].Address] = byte(2)
 
 	// Add given control table values
 	for addr, val := range b {
-		n.controlTable[addr] = val
+		p.controlTable[addr] = val
 	}
 
-	s := NewWithReturnLevel(n, m, 1, 2)
-	return n, s
+	s := NewWithReturnLevel(p, m, 1, 2)
+	return p, s
 }
 
 // Not implemented
-func (n *mockProto) Ping(ident int) error {
+func (p *mockProto) Ping(ident int) error {
 	return nil
 }
 
-func (n *mockProto) ReadData(ident int, addr int, count int) ([]byte, error) {
-	return n.controlTable[int(addr) : int(addr)+count], nil
+func (p *mockProto) ReadData(ident int, addr int, count int) ([]byte, error) {
+	return p.controlTable[int(addr) : int(addr)+count], nil
 }
 
-func (n *mockProto) WriteData(ident int, address int, data []byte, expectResponse bool) error {
+func (p *mockProto) WriteData(ident int, address int, data []byte, expectResponse bool) error {
 	for i, val := range data {
-		n.controlTable[address+i] = val
+		p.controlTable[address+i] = val
 	}
 
 	return nil
 }
 
-func (n *mockProto) Log(string, ...interface{}) {
+func (p *mockProto) RegWrite(ident int, address int, data []byte, expectResponse bool) error {
+	p.writeBuf = append(p.writeBuf, writeEvent{address, data})
+	return nil
+}
+
+func (p *mockProto) Action() error {
+	for _, ev := range p.writeBuf {
+		p.WriteData(1, ev.addr, ev.data, false)
+	}
+
+	p.writeBuf = nil
+	return nil
+}
+
+// Not implemented
+func (p *mockProto) Log(string, ...interface{}) {
 }
